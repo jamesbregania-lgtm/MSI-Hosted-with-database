@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin — MSI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/admin_account.css">
+</head>
+<body>
+
+<aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+        <div class="brand-icon">
+            <img src="/Image_Logo/MSI%20LOGO%20ORIGINAL%202%20(1)%20copy_edited.avif">
+        </div>
+        <span class="brand-name">MSI Admin</span>
+    </div>
+
+    <nav class="sidebar-nav">
+        <button class="nav-item active" data-section="employees" onclick="switchSection('employees', this)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+            <span>Employees</span>
+        </button>
+        <button class="nav-item" data-section="clients" onclick="switchSection('clients', this)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+            <span>Clients</span>
+        </button>
+    </nav>
+    
+    <div class="sidebar-footer">
+        <div class="admin-info">
+            <div class="admin-avatar"><%= currentUser.fullName.charAt(0).toUpperCase() %></div>
+            <div class="admin-details">
+                <span class="admin-name"><%= currentUser.fullName %></span>
+                <span class="admin-role"><%= currentUser.department %></span>
+            </div>
+        </div>
+        <a href="/logout" class="logout-btn" title="Logout">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </a>
+    </div>
+</aside>
+
+<!-- MAIN CONTENT -->
+<main class="main-content">
+
+    <!-- FLASH MESSAGES -->
+    <% if (success) { %>
+        <div class="flash flash-success" id="flashMsg">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            <%= success %>
+        </div>
+    <% } %>
+    <% if (error) { %>
+        <div class="flash flash-error" id="flashMsg">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <%= error %>
+        </div>
+    <% } %>
+
+    <section class="section active" id="section-employees">
+        <div class="section-header">
+            <div>
+                <h1>Employee Accounts</h1>
+                <p>Create, update, and manage corporate user accounts.</p>
+            </div>
+            <button class="btn btn-primary" onclick="openModal('modal-create-employee')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                New Account
+            </button>
+        </div>
+
+        <!-- Stats Row -->
+        <div class="stats-row">
+            <div class="stat-chip">
+                <span class="stat-num" id="stat-total-emp"><%= accounts.length %></span>
+                <span class="stat-label">Total</span>
+            </div>
+            <div class="stat-chip">
+                <span class="stat-num" id="stat-active-emp"><%= accounts.filter(a => a.status !== 'inactive').length %></span>
+                <span class="stat-label">Active</span>
+            </div>
+            <div class="stat-chip">
+                <span class="stat-num" id="stat-inactive-emp"><%= accounts.filter(a => a.status === 'inactive').length %></span>
+                <span class="stat-label">Inactive</span>
+            </div>
+        </div>
+
+        <!-- Employee Table Card -->
+        <div class="card">
+            <div class="card-toolbar">
+                <div class="search-wrap">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input type="text" id="accountSearch" placeholder="Search name, department…" oninput="filterAccounts()">
+                </div>
+                <div class="filter-tabs">
+                    <button class="filter-tab active" onclick="filterByStatus('all', this)">All</button>
+                    <button class="filter-tab" onclick="filterByStatus('active', this)">Active</button>
+                    <button class="filter-tab" onclick="filterByStatus('inactive', this)">Inactive</button>
+                </div>
+            </div>
+
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Employee</th>
+                            <th>Username</th>
+                            <th>Department</th>
+                            <th>Branch</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="accountTableBody">
+                        <% accounts.forEach((account, index) => { %>
+                        <tr class="emp-row" data-status="<%= account.status === 'inactive' ? 'inactive' : 'active' %>">
+                            <td><%= index + 1 %></td>
+                            <td>
+                                <div class="person-cell">
+                                    <div class="avatar-sm"><%= account.fullName.charAt(0).toUpperCase() %></div>
+                                    <span><%= account.fullName %></span>
+                                </div>
+                            </td>
+                            <td><code class="mono"><%= account.username %></code></td>
+                            <td><%= account.department %></td>
+                            <td><%= account.branch %></td>
+                            <td>
+                                <% if (account.status === 'inactive') { %>
+                                    <span class="badge badge-inactive">Inactive</span>
+                                <% } else { %>
+                                    <span class="badge badge-active">Active</span>
+                                <% } %>
+                            </td>
+                            <td>
+                                <div class="action-btns">
+                                    <button class="icon-btn icon-edit" title="Edit"
+                                        onclick="openEditEmployee('<%= account.username %>', '<%= account.fullName %>', '<%= account.department %>', '<%= account.branch %>')">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                    </button>
+                                    <button class="icon-btn icon-key" title="Reset Password"
+                                        onclick="openResetPass('<%= account.username %>')">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                                    </button>
+                                    <% if (account.status === 'inactive') { %>
+                                    <button class="icon-btn icon-enable" title="Reactivate"
+                                        onclick="toggleEmployee('<%= account.username %>', 'active')">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                                    </button>
+                                    <% } else { %>
+                                    <button class="icon-btn icon-disable" title="Deactivate"
+                                        onclick="toggleEmployee('<%= account.username %>', 'inactive')">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                                    </button>
+                                    <% } %>
+                                </div>
+                            </td>
+                        </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <section class="section" id="section-clients">
+        <div class="section-header">
+            <div>
+                <h1>Client Management</h1>
+                <p>Add, update, and toggle client partnership status.</p>
+            </div>
+            <button class="btn btn-primary" onclick="openModal('modal-create-client')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                New Client
+            </button>
+        </div>
+
+        <!-- Stats Row -->
+        <div class="stats-row">
+            <div class="stat-chip">
+                <span class="stat-num" id="stat-total-cli"><%= clients.length %></span>
+                <span class="stat-label">Total</span>
+            </div>
+            <div class="stat-chip">
+                <span class="stat-num" id="stat-active-cli"><%= clients.filter(c => c.status !== 'inactive').length %></span>
+                <span class="stat-label">Active</span>
+            </div>
+            <div class="stat-chip">
+                <span class="stat-num" id="stat-inactive-cli"><%= clients.filter(c => c.status === 'inactive').length %></span>
+                <span class="stat-label">Inactive</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-toolbar">
+                <div class="search-wrap">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input type="text" id="clientSearch" placeholder="Search client, location…" oninput="filterClients()">
+                </div>
+                <div class="filter-tabs">
+                    <button class="filter-tab active" onclick="filterClientsByStatus('all', this)">All</button>
+                    <button class="filter-tab" onclick="filterClientsByStatus('active', this)">Active</button>
+                    <button class="filter-tab" onclick="filterClientsByStatus('inactive', this)">Inactive</button>
+                </div>
+            </div>
+
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Client Name</th>
+                            <th>Location / Contact</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="clientTableBody">
+                        <% clients.forEach((client, index) => { %>
+                        <tr class="cli-row" data-status="<%= client.status === 'inactive' ? 'inactive' : 'active' %>">
+                            <td><%= index + 1 %></td>
+                            <td>
+                                <div class="person-cell">
+                                    <div class="avatar-sm avatar-client"><%= client.name.charAt(0).toUpperCase() %></div>
+                                    <span><%= client.name %></span>
+                                </div>
+                            </td>
+                            <td><%= client.location || '—' %></td>
+                            <td>
+                                <% if (client.status === 'inactive') { %>
+                                    <span class="badge badge-inactive">Inactive</span>
+                                <% } else { %>
+                                    <span class="badge badge-active">Active</span>
+                                <% } %>
+                            </td>
+                            <td>
+                                <div class="action-btns">
+                                    <button class="icon-btn icon-edit" title="Edit"
+                                        onclick="openEditClient('<%= client.id %>', '<%= client.name %>', '<%= client.location %>')">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                    </button>
+                                    <% if (client.status === 'inactive') { %>
+                                    <button class="icon-btn icon-enable" title="Reactivate"
+                                        onclick="toggleClient('<%= client.id %>', 'active')">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                                    </button>
+                                    <% } else { %>
+                                    <button class="icon-btn icon-disable" title="Deactivate"
+                                        onclick="toggleClient('<%= client.id %>', 'inactive')">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                                    </button>
+                                    <% } %>
+                                </div>
+                            </td>
+                        </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+</main>
+
+<!-- Modal: Create Employee -->
+<div class="modal-overlay" id="modal-create-employee" onclick="closeOnOverlay(event, 'modal-create-employee')">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Create Employee Account</h3>
+            <button class="modal-close" onclick="closeModal('modal-create-employee')">×</button>
+        </div>
+        <form action="/admin_account/employees/create" method="POST">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" name="username" placeholder=" juan_dela_cruz"
+                        pattern="^[a-z0-9_]{4,20}$"
+                        title="Lowercase, numbers, underscore (4–20 chars)" required>
+                    <small>Lowercase letters, numbers, underscores only (4–20 chars)</small>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" name="password" placeholder="Min. 6 characters"
+                        pattern="^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$"
+                        title="Must contain letters and numbers (min 6 chars)" required>
+                    <small>Must contain letters and numbers</small>
+                </div>
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" name="fullName" id="fullName" placeholder="James Reid"
+                        pattern="^[A-Za-z\s]+$" title="Letters and spaces only" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Department</label>
+                        <input type="text" name="department" id="department" placeholder="OPERATIONS" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Branch</label>
+                        <select name="branch" required>
+                            <option value="">Select Branch</option>
+                            <option value="Silang">Silang</option>
+                            <option value="Davao">Davao</option>
+                            <option value="Visayas">Visayas</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-ghost" onclick="closeModal('modal-create-employee')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Create Account</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Edit Employee -->
+<div class="modal-overlay" id="modal-edit-employee" onclick="closeOnOverlay(event, 'modal-edit-employee')">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Edit Employee</h3>
+            <button type="button" class="modal-close" onclick="closeModal('modal-edit-employee')">×</button>
+        </div>
+        <form action="/admin_account/employees/update" method="POST">
+            <input type="hidden" name="username" id="editEmpUsername">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" name="fullName" id="editEmpFullName"
+                        pattern="^[A-Za-z\s]+$" title="Letters and spaces only" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Department</label>
+                        <input type="text" name="department" id="editEmpDept" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Branch</label>
+                        <select name="branch" id="editEmpBranch" required>
+                            <option value="Silang">Silang</option>
+                            <option value="Davao">Davao</option>
+                            <option value="Visayas">Visayas</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-ghost" onclick="closeModal('modal-edit-employee')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Reset Password -->
+<div class="modal-overlay" id="modal-reset-pass" onclick="closeOnOverlay(event, 'modal-reset-pass')">
+    <div class="modal modal-sm">
+        <div class="modal-header">
+            <h3>Reset Password</h3>
+            <button type="button" class="modal-close" onclick="closeModal('modal-reset-pass')">×</button>
+        </div>
+        <form action="/admin_account/employees/reset-password" method="POST">
+            <input type="hidden" name="username" id="resetPassUsername">
+            <div class="modal-body">
+                <p class="modal-desc">Resetting password for: <strong id="resetPassDisplay"></strong></p>
+                <div class="form-group">
+                    <label>New Password</label>
+                    <input
+                        type="text"
+                        name="newPassword"
+                        placeholder="New password"
+                        pattern="^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*?&]{8,}$"
+                        title="Must contain letters and numbers (minimum 8 characters)"
+                        required
+                    >
+                    <small>Must contain letters and numbers (minimum 8 characters)</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-ghost" onclick="closeModal('modal-reset-pass')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Reset Password</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<form id="form-toggle-emp" action="/admin_account/employees/toggle" method="POST" style="display:none">
+    <input type="hidden" name="username" id="toggleEmpUsername">
+    <input type="hidden" name="status" id="toggleEmpStatus">
+</form>
+
+<div class="modal-overlay" id="modal-create-client" onclick="closeOnOverlay(event, 'modal-create-client')">
+    <div class="modal modal-sm">
+        <div class="modal-header">
+            <h3>Add New Client</h3>
+            <button class="modal-close" onclick="closeModal('modal-create-client')">×</button>
+        </div>
+        <form action="/admin_account/clients/create" method="POST">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Client Name</label>
+                    <input type="text" name="clientName" placeholder=" Acme Corp" required>
+                </div>
+                <div class="form-group">
+                    <label>Location / Contact Person</label>
+                    <input type="text" name="location" placeholder=" Neil Ella">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-ghost" onclick="closeModal('modal-create-client')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Add Client</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Edit Client -->
+<div class="modal-overlay" id="modal-edit-client" onclick="closeOnOverlay(event, 'modal-edit-client')">
+    <div class="modal modal-sm">
+        <div class="modal-header">
+            <h3>Edit Client</h3>
+            <button class="modal-close" onclick="closeModal('modal-edit-client')">×</button>
+        </div>
+        <form action="/admin_account/clients/update" method="POST">
+            <input type="hidden" name="clientId" id="editClientId">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Client Name</label>
+                    <input type="text" name="clientName" id="editClientName" required>
+                </div>
+                <div class="form-group">
+                    <label>Location / Contact Person</label>
+                    <input type="text" name="location" id="editClientLocation">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-ghost" onclick="closeModal('modal-edit-client')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Hidden form: Toggle Client Status -->
+<form id="form-toggle-cli" action="/admin_account/clients/toggle" method="POST" style="display:none">
+    <input type="hidden" name="clientId" id="toggleCliId">
+    <input type="hidden" name="status" id="toggleCliStatus">
+</form>
+
+<script src="/js/admin_account.js"></script>
+</body>
+</html>

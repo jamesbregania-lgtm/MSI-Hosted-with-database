@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Add Printer Asset — MSI</title>
+    <link rel="stylesheet" href="/css/user_account.css" />
+</head>
+<body>
+    <div class="container">
+        <div class="header-bar">
+            <div class="header-left">
+                <h1>MSI Printer Assets Management System</h1>
+                <p>Add new printer asset for client.</p>
+            </div>
+            <div class="header-actions">
+                <a href="/user_account" class="btn">Back to Dashboard</a>
+                <div class="user-badge">
+                    <span><%= currentUser.fullName %></span>
+                    <small><%= currentUser.department %></small>
+                </div>
+                <a href="/logout" class="btn logout-btn">Logout</a>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <div>
+                    <h2>Printer Asset Form</h2>
+                    <p>Choose a client and fill in the machine details.</p>
+                </div>
+            </div>
+
+            <% if (success) { %>
+            <div class="flash flash-success" id="flashMsg"><%= success %></div>
+            <% } %>
+            <% if (error) { %>
+            <div class="flash flash-error" id="flashMsg"><%= error %></div>
+            <% } %>
+
+            <form id="assetForm" action="/user_account/new-machine" method="POST">
+                <div class="form-grid">
+
+                    <label for="clientInput">Client</label>
+                    <div class="combo-wrap">
+                        <input type="text" id="clientInput" name="clientName" autocomplete="off" placeholder="Type client name..." required>
+                        <input type="hidden" id="clientId" name="clientId" value="<%= selectedClientId %>">
+                        <ul id="clientDropdown" class="combo-dropdown" aria-label="Client suggestions"></ul>
+                    </div>
+
+                    <label for="unit">Unit</label>
+                    <select id="unit" name="unit" required>
+                        <option value="">Select a unit</option>
+                        <option value="2200" <%= (savedAsset && savedAsset.unit === '2200') ? 'selected' : '' %>>2200</option>
+                        <option value="CIJ" <%= (savedAsset && savedAsset.unit === 'CIJ') ? 'selected' : '' %>>CIJ</option>
+                        <option value="TTO" <%= (savedAsset && savedAsset.unit === 'TTO') ? 'selected' : '' %>>TTO</option>
+                        <option value="DOD" <%= (savedAsset && savedAsset.unit === 'DOD') ? 'selected' : '' %>>DOD</option>
+                        <option value="LASER" <%= (savedAsset && savedAsset.unit === 'LASER') ? 'selected' : '' %>>LASER</option>
+                    </select>
+                    <label for="model">Model</label>
+                    <input type="text" id="model" name="model" placeholder="Enter model name" value="<%= savedAsset ? savedAsset.model : '' %>" required />
+
+                    <label for="serialNo">Serial No.</label>
+                    <input type="text" id="serialNo" name="serialNo" placeholder="Enter serial number" value="<%= savedAsset ? savedAsset.serialNo : '' %>" required />
+
+                    <label for="dateInstalled">Date Installed</label>
+                    <input type="date" id="dateInstalled" name="dateInstalled" value="<%= savedAsset ? savedAsset.dateInstalled : '' %>" required />
+
+                    <label for="runningHours">Running Hours</label>
+                    <input type="number" id="runningHours" name="runningHours" min="0" step="1" placeholder="e.g. 1200" value="<%= savedAsset ? savedAsset.runningHours : '' %>" required />
+
+                    <label for="status">Status</label>
+                    <select id="status" name="status" required>
+                        <option value="">Select status</option>
+                        <option value="Active" <%= (savedAsset && savedAsset.status === 'Active') ? 'selected' : '' %>>Active</option>
+                        <option value="Maintenance" <%= (savedAsset && savedAsset.status === 'Maintenance') ? 'selected' : '' %>>Maintenance</option>
+                        <option value="Faulty" <%= (savedAsset && savedAsset.status === 'Faulty') ? 'selected' : '' %>>Faulty</option>
+                        <option value="Inactive" <%= (savedAsset && savedAsset.status === 'Inactive') ? 'selected' : '' %>>Inactive</option>
+                    </select>
+
+                    <label for="description">Description</label>
+                    <textarea id="description" name="description" rows="4" placeholder="Description"><%= savedAsset ? savedAsset.description : '' %></textarea>
+
+                    <label for="history">History</label>
+                    <textarea id="history" name="history" rows="4" placeholder="History Unit"><%= savedAsset ? savedAsset.history : '' %></textarea>
+                </div>
+
+                <div style="margin-top: .8rem; display: flex; gap: .6rem; flex-wrap: wrap; align-items: center;">
+                    <button type="submit" class="btn btn-primary">Submit</button>
+                    <% if (savedAsset) { %>
+                    <span style="color: #1e7c3a; font-weight: 500;">
+                        Submitted — Unit: <%= savedAsset.unit %>, Model: <%= savedAsset.model %>, Serial: <%= savedAsset.serialNo %>
+                    </span>
+                    <% } %>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const CLIENTS = <%- JSON.stringify(clients) %>;
+        const INITIAL_CLIENT_ID = '<%= selectedClientId %>';
+    </script>
+    <script src="/js/user_asset_form.js"></script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>User Account — MSI</title>
+    <link rel="stylesheet" href="/css/user_account.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header-bar">
+            <div class="header-left">
+                <h1>MSI Printer Assets Management System</h1>
+                <p>User Account Dashboard</p>
+            </div>
+            <div class="header-actions">
+                <a href="/user_account/new-machine" class="btn btn-primary" style="margin-right: 12px;">Add Printer Asset</a>
+                <div class="user-badge">
+                    <span><%= currentUser.fullName %></span>
+                    <small><%= currentUser.department %></small>
+                </div>
+                <a href="/logout" class="btn logout-btn">Logout</a>
+            </div>
+        </div>
+
+        <div id="client-section" class="client-section">
+        <div class="card">
+            <div class="card-header">
+                <div>
+                        <h2>Partnership Clients</h2>
+                        <p>Select a client to view their machine records.</p>
+            </div>
+                    <div class="search-wrap">
+                        <svg class="search-icon" width="15" height="15" viewBox="0 0 15 15" fill="none">
+                            <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.4"/>
+                            <path d="M10 10l3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                        </svg>
+                        <input
+                            type="text"
+                            id="clientSearch"
+                            placeholder="Search client..."
+                            oninput="filterClients()"
+                        />
+                    </div>
+                </div>
+
+                <div class="client-list-head">
+                    <span class="col-num">#</span>
+                    <span class="col-name">Client Name</span>
+                    <span class="col-badge">Location</span>
+                    <span class="col-arrow"></span>
+                </div>
+
+                <div class="client-list" id="client-grid"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const CLIENTS = <%- JSON.stringify(clients) %>;
+    </script>
+    <script src="/js/user_account.js"></script>
+</body>
+</html>
