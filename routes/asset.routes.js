@@ -69,11 +69,53 @@ router.get('/new-machine', requireAuth, (req, res) => {
 
 router.post('/new-machine', requireAuth, (req, res) => {
   const activeClients = clients.filter(c => c.status !== 'inactive');
-  let { clientId, unit, model, serialNo, dateInstalled, runningHours, status, description, history } = req.body;
+  let { clientId, unit, model, serialNo, dateInstalled, runningHours, status, description } = req.body;
 
   // Normalize model to uppercase for consistency
   if (model) {
     model = model.toUpperCase().trim();
+  }
+
+  // Enforce available model list for the selected unit.
+  const unitKey = Object.keys(PARTS_CATALOG).find(
+    key => key.toUpperCase() === String(unit || '').toUpperCase().trim()
+  );
+  const allowedModels = unitKey
+    ? Object.keys(PARTS_CATALOG[unitKey] || {}).filter(m => (PARTS_CATALOG[unitKey][m] || []).length > 0)
+    : [];
+
+  if (!allowedModels.length) {
+    return res.render('user_asset_form', {
+      currentUser: req.session.user,
+      clients: activeClients,
+      selectedClientId: clientId || '',
+      success: null,
+      error: 'No available models for the selected unit.',
+      savedAsset: null,
+      partsCatalog: PARTS_CATALOG
+    });
+  }
+
+  const isModelAllowed = allowedModels.some(m => m.toUpperCase() === model);
+  if (!isModelAllowed) {
+    return res.render('user_asset_form', {
+      currentUser: req.session.user,
+      clients: activeClients,
+      selectedClientId: clientId || '',
+      success: null,
+      error: 'Invalid model for the selected unit.',
+      savedAsset: {
+        clientId,
+        unit,
+        model,
+        serialNo,
+        dateInstalled,
+        runningHours,
+        status,
+        description
+      },
+      partsCatalog: PARTS_CATALOG
+    });
   }
 
   // Fallback: if clientId is empty but clientName was submitted, match by name.
@@ -125,7 +167,6 @@ router.post('/new-machine', requireAuth, (req, res) => {
     runningHours,
     status,
     description,
-    history: history || '',
     submittedBy: req.session.user
       ? req.session.user.fullName || req.session.user.username || 'Unknown User'
       : 'Unknown User'

@@ -126,18 +126,49 @@ function parseDateStr(dateStr) {
     return null;
 }
 
+function getTodayDateString() {
+    const today = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    return `${pad(today.getDate())}/${pad(today.getMonth() + 1)}/${today.getFullYear()}`;
+}
+
+function getPartsCatalogLocation(record) {
+    const unitKey = Object.keys(PARTS_CATALOG).find(
+        key => key.toUpperCase() === (record?.unit || '').toUpperCase().trim()
+    ) || '';
+    const modelMap = unitKey ? (PARTS_CATALOG[unitKey] || {}) : {};
+    const modelKey = Object.keys(modelMap).find(
+        key => key.toUpperCase() === (record?.model || '').toUpperCase().trim()
+    ) || '';
+
+    return { unitKey, modelKey, modelMap };
+}
+
+
+function getMaintenanceAnchorDate(dateInstalled, record) {
+    let anchorDate = null;
+
+    if (record?.maintenanceServiceDate) {
+        anchorDate = parseDateStr(record.maintenanceServiceDate);
+    }
+
+    if (!anchorDate) {
+        anchorDate = parseDateStr(dateInstalled);
+    }
+
+    return anchorDate;
+}
 
 function calculateNextMaintenanceResult(dateInstalled, runningHoursSeconds, record, maintenanceIntervalDays = 750) {
-    // Parse the install date
-    let installDate = parseDateStr(dateInstalled);
-    
-    if (!installDate) {
+    const anchorDate = getMaintenanceAnchorDate(dateInstalled, record);
+
+    if (!anchorDate) {
         return { label: '—', date: null };
     }
-    
-    // Calculate maintenance date: install date + 750 days
-    const maintenanceDate = new Date(installDate);
-    maintenanceDate.setDate(installDate.getDate() + maintenanceIntervalDays);
+
+    // Calculate maintenance date from the most recent maintenance anchor.
+    const maintenanceDate = new Date(anchorDate);
+    maintenanceDate.setDate(anchorDate.getDate() + maintenanceIntervalDays);
     
     const monthNames = [
         'January', 'February', 'March', 'April', 'May', 'June',
@@ -148,6 +179,29 @@ function calculateNextMaintenanceResult(dateInstalled, runningHoursSeconds, reco
     return { label, date: maintenanceDate };
 }
 
+function getMaintenanceStatus(dateInstalled, runningHoursSeconds, record, warningDays = 30) {
+    const result = calculateNextMaintenanceResult(dateInstalled, runningHoursSeconds, record);
+    if (!result.date) {
+        return {
+            date: null,
+            isOverdue: false,
+            isDueSoon: false,
+            label: '—'
+        };
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diffDays = Math.floor((result.date - today) / (1000 * 60 * 60 * 24));
+
+    return {
+        date: result.date,
+        isOverdue: diffDays < 0,
+        isDueSoon: diffDays >= 0 && diffDays <= warningDays,
+        label: result.label
+    };
+}
+
 function calculateNextMaintenance(dateInstalled, runningHoursSeconds, record) {
     return calculateNextMaintenanceResult(dateInstalled, runningHoursSeconds, record).label;
 }
@@ -155,27 +209,32 @@ function calculateNextMaintenance(dateInstalled, runningHoursSeconds, record) {
 // Returns true if maintenance is overdue or within the next 30 calendar days
 // Fix: Use Math.floor instead of Math.ceil for more accurate "within 30 days" calculation
 function isWithin30Days(dateInstalled, runningHoursSeconds, record) {
-    const result = calculateNextMaintenanceResult(dateInstalled, runningHoursSeconds, record);
-    if (!result.date) return false;
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const diffDays = Math.floor((result.date - today) / (1000 * 60 * 60 * 24));
-    // Show warning if due today (diffDays === 0) or within next 30 days OR overdue (diffDays < 0)
-    return diffDays <= 30;
+    const s = getMaintenanceStatus(dateInstalled, runningHoursSeconds, record, 30);
+    return s.isOverdue || s.isDueSoon;
 }
 
-// Fix parts expiration: change "due soon" from 7 days to 30 days to match maintenance
+// Parts warning logic: warn 7 days before expiry; each part keeps its own anchor date.
 function getPartStatus(currentHours, part, record) {
     let anchorDate = null;
+    let serviceHoursBase = null;
 
-    // Get latest update date
-    if (record?.updates?.length > 0) {
-        const lastUpdate = record.updates[record.updates.length - 1];
-        anchorDate = parseDateStr(lastUpdate.date);
+    // Per-part override: if this part was manually marked as serviced, use that date first.
+    if (record?.partServiceDates && part?.name) {
+        const servicedDate = record.partServiceDates[part.name];
+        if (servicedDate) {
+            anchorDate = parseDateStr(servicedDate);
+        }
     }
 
-    // Fallback to install date
+    if (record?.partServiceHours && part?.name) {
+        const baseHours = Number(record.partServiceHours[part.name]);
+        if (Number.isFinite(baseHours)) {
+            serviceHoursBase = baseHours;
+        }
+    }
+
+    // Fallback to machine install date.
+    // Important: a normal machine record update must NOT reset all parts.
     if (!anchorDate) {
         anchorDate = parseDateStr(record.dateInstalled);
     }
@@ -203,7 +262,10 @@ function getPartStatus(currentHours, part, record) {
     // ✅ HOURS-BASED
     // =========================
     else if (part.expiryHours) {
-        const hoursLeft = part.expiryHours - currentHours;
+        const usedHours = serviceHoursBase == null
+            ? currentHours
+            : Math.max(0, currentHours - serviceHoursBase);
+        const hoursLeft = part.expiryHours - usedHours;
 
         expiryDate = new Date(anchorDate);
 
@@ -257,63 +319,6 @@ function getPartStatus(currentHours, part, record) {
         isDueSoon,
         label
     };
-}
-
-// Fix the warning icon display in renderTable - ensure it shows for BOTH conditions
-// The current code is correct but add a check for "due today" as well
-function renderTable(records) {
-    const tbody = document.getElementById('machine-tbody');
-
-    if (!records.length) {
-        tbody.innerHTML = `<tr><td colspan="8" class="loading-row">No records found.</td></tr>`;
-        document.getElementById('pagination-bar').style.display = 'none';
-        return;
-    }
-
-    records.forEach(r => {
-        if (typeof r._runningSeconds === 'undefined') {
-            r._runningSeconds = parseRunningHoursToSeconds(r.runningHours);
-        }
-    });
-
-    const pageRecords = getPageSlice(records, currentPage);
-    const globalOffset = (currentPage - 1) * PAGE_SIZE;
-
-    tbody.innerHTML = pageRecords.map((r, i) => {
-        const globalI = globalOffset + i;
-        const recordIndex = findMachineIndexByRecord(r);
-
-        const nextMaintenance = calculateNextMaintenance(r.dateInstalled, r._runningSeconds, r);
-        
-        // Check BOTH conditions for warning icon
-        const maintenanceDueSoon = isWithin30Days(r.dateInstalled, r._runningSeconds, r);
-        const partsDueSoon = hasDueSoonPart(r);
-        const showWarning = maintenanceDueSoon || partsDueSoon;
-
-        const numCell = showWarning
-            ? `<td class="warn-cell">
-                 <span class="maintenance-warning" title="Maintenance or parts expiration due soon — click to update"
-                       onclick="event.stopPropagation(); openEditModal(${recordIndex})">
-                   ${WARNING_ICON_SVG}
-                 </span>
-                </td>`
-            : `<td>${globalI + 1}</td>`;
-
-        return `
-            <tr class="clickable-row" onclick="showDetails(${recordIndex})">
-                ${numCell}
-                <td>${r.unit || '—'}</td>
-                <td>${r.model || '—'}</td>
-                <td>${r.serialNo || '—'}</td>
-                <td>${formatDateDisplay(r.dateInstalled)}</td>
-                <td class="running-hours" data-index="${recordIndex}">${formatRunningHoursOnly(r._runningSeconds)}</td>
-                <td>${r.status || '—'}</td>
-                <td class="${nextMaintenance === 'Overdue' ? 'overdue' : ''}">${nextMaintenance}</td>
-             </tr>
-        `;
-    }).join('');
-
-    renderPagination(records);
 }
 
 function findMachineIndexByRecord(record) {
@@ -437,21 +442,12 @@ function addMonths(date, months) {
     return d;
 }
 
-
-/**
- * Returns true if ANY part on a machine record is due within 7 days or overdue.
- * Used to show the ⚠ icon in the table.
- */
 function hasDueSoonPart(record) {
-    const unit = (record.unit || '').toUpperCase().trim();
-    const unitKey = Object.keys(PARTS_CATALOG).find(k => k.toUpperCase() === unit);
+    const { unitKey, modelKey } = getPartsCatalogLocation(record);
     if (!unitKey) return false;
-    
-    const models = PARTS_CATALOG[unitKey];
-    const modelKey = Object.keys(models).find(k => k.toUpperCase() === (record.model || '').toUpperCase().trim());
     if (!modelKey) return false;
-    
-    const parts = models[modelKey];
+
+    const parts = (PARTS_CATALOG[unitKey] || {})[modelKey];
     const currentHours = (record._runningSeconds || 0) / 3600;
     
     // Check each part - if ANY part is overdue OR due soon, return true
@@ -648,7 +644,155 @@ historyPopup.addEventListener('click', (e) => {
 
 const editPopup = document.getElementById('editPopup');
 const closeEditPopup = document.getElementById('closeEditPopup');
+const cancelEditBtn = document.getElementById('cancelEditBtn');
 const editForm = document.getElementById('editForm');
+const confirmOverlay = document.getElementById('confirmOverlay');
+const confirmTitle = document.getElementById('confirmTitle');
+const confirmMessage = document.getElementById('confirmMessage');
+const confirmOkBtn = document.getElementById('confirmOkBtn');
+const confirmCancelBtn = document.getElementById('confirmCancelBtn');
+let editDraft = null;
+let activeConfirmResolver = null;
+
+function showConfirmDialog(options = {}) {
+    const {
+        title = 'Please Confirm',
+        message = 'Are you sure?',
+        confirmText = 'Confirm',
+        cancelText = 'Cancel',
+        tone = 'default'
+    } = options;
+
+    if (!confirmOverlay || !confirmTitle || !confirmMessage || !confirmOkBtn || !confirmCancelBtn) {
+        return Promise.resolve(window.confirm(message));
+    }
+
+    if (activeConfirmResolver) {
+        activeConfirmResolver(false);
+        activeConfirmResolver = null;
+    }
+
+    confirmTitle.textContent = title;
+    confirmMessage.textContent = message;
+    confirmOkBtn.textContent = confirmText;
+    confirmCancelBtn.textContent = cancelText;
+
+    confirmOkBtn.classList.remove('is-warning', 'is-danger');
+    if (tone === 'warning') confirmOkBtn.classList.add('is-warning');
+    if (tone === 'danger') confirmOkBtn.classList.add('is-danger');
+
+    confirmOverlay.style.display = 'grid';
+    requestAnimationFrame(() => confirmOkBtn.focus());
+
+    return new Promise((resolve) => {
+        activeConfirmResolver = resolve;
+    });
+}
+
+function resolveConfirmDialog(result) {
+    if (!activeConfirmResolver) return;
+    const resolver = activeConfirmResolver;
+    activeConfirmResolver = null;
+    confirmOverlay.style.display = 'none';
+    resolver(result);
+}
+
+function clonePartMap(map) {
+    if (!map || typeof map !== 'object') return {};
+    return { ...map };
+}
+
+function buildEditDraft(record, index) {
+    return {
+        index,
+        runningHours: formatRunningHoursOnly(record._runningSeconds),
+        status: record.status || '',
+        description: record.description || '',
+        maintenanceServiceDate: record.maintenanceServiceDate || '',
+        partServiceDates: clonePartMap(record.partServiceDates),
+        partServiceHours: clonePartMap(record.partServiceHours)
+    };
+}
+
+function clearEditDraft() {
+    editDraft = null;
+}
+
+function syncEditDraftFromInputs() {
+    if (!editDraft) return;
+    editDraft.runningHours = document.getElementById('edit-runningHours').value || '0';
+    editDraft.status = document.getElementById('edit-status').value || '';
+    editDraft.description = document.getElementById('edit-description').value || '';
+}
+
+async function closeEditModal(discardChanges = false) {
+    if (!discardChanges && hasEditDraftChanges()) {
+        const shouldDiscard = await showConfirmDialog({
+            title: 'Discard Changes?',
+            message: 'You have unsaved updates in this form. Discard them?',
+            confirmText: 'Discard',
+            cancelText: 'Keep Editing',
+            tone: 'warning'
+        });
+        if (!shouldDiscard) return;
+    }
+
+    editPopup.style.display = 'none';
+    clearEditDraft();
+}
+
+function hasEditDraftChanges() {
+    if (!editDraft) return false;
+    const index = editDraft.index;
+    const record = allMachines[index];
+    if (!record) return false;
+
+    const liveHours = formatRunningHoursOnly(record._runningSeconds);
+    const draftHours = String(editDraft.runningHours || '0');
+    const liveStatus = record.status || '';
+    const liveDescription = record.description || '';
+    const liveMaintenanceServiceDate = record.maintenanceServiceDate || '';
+
+    const liveDates = JSON.stringify(clonePartMap(record.partServiceDates));
+    const draftDates = JSON.stringify(clonePartMap(editDraft.partServiceDates));
+    const livePartHours = JSON.stringify(clonePartMap(record.partServiceHours));
+    const draftPartHours = JSON.stringify(clonePartMap(editDraft.partServiceHours));
+
+    return (
+        draftHours !== liveHours ||
+        (editDraft.status || '') !== liveStatus ||
+        (editDraft.description || '') !== liveDescription ||
+        (editDraft.maintenanceServiceDate || '') !== liveMaintenanceServiceDate ||
+        draftDates !== liveDates ||
+        draftPartHours !== livePartHours
+    );
+}
+
+function validateEditFormInputs() {
+    const runningInput = document.getElementById('edit-runningHours');
+    const statusInput = document.getElementById('edit-status');
+
+    const runningRaw = String(runningInput.value || '').trim();
+    const runningNum = Number(runningRaw);
+
+    if (runningRaw === '') {
+        return { valid: false, message: 'Running Hours is required.' };
+    }
+    if (!Number.isFinite(runningNum) || Number.isNaN(runningNum)) {
+        return { valid: false, message: 'Running Hours must be a valid number.' };
+    }
+    if (runningNum < 0) {
+        return { valid: false, message: 'Running Hours cannot be negative.' };
+    }
+    if (!Number.isInteger(runningNum)) {
+        return { valid: false, message: 'Running Hours must be a whole number.' };
+    }
+    if (!statusInput.value) {
+        return { valid: false, message: 'Status is required.' };
+    }
+
+    return { valid: true };
+}
 
 window.openEditModal = function(index) {
     const record = allMachines[index];
@@ -663,74 +807,32 @@ window.openEditModal = function(index) {
     document.getElementById('edit-model-display').textContent = record.model || '—';
     document.getElementById('edit-serial-display').textContent = record.serialNo || '—';
 
+    editDraft = buildEditDraft(record, index);
+
     // Pre-fill editable fields
-    document.getElementById('edit-runningHours').value = formatRunningHoursOnly(record._runningSeconds);
+    document.getElementById('edit-runningHours').value = editDraft.runningHours;
 
     const statusSel = document.getElementById('edit-status');
-    statusSel.value = record.status || '';
+    statusSel.value = editDraft.status;
 
-    document.getElementById('edit-description').value = record.description || '';
-    document.getElementById('edit-history').value = record.history || '';
+    document.getElementById('edit-description').value = editDraft.description;
 
-    // ── Parts checker section ──────────────────────────────────────────────
-    const unitKey = Object.keys(PARTS_CATALOG).find(
-        k => k.toUpperCase() === (record.unit || '').toUpperCase().trim()
-    );
+    syncEditDraftFromInputs();
 
-    // Populate Unit selector
-    const unitSel = document.getElementById('parts-unit-sel');
-    unitSel.innerHTML = '<option value="">— Select Unit —</option>' +
-        Object.keys(PARTS_CATALOG).map(u =>
-            `<option value="${u}" ${u === unitKey ? 'selected' : ''}>${u}</option>`
-        ).join('');
+    // Parts checker is fixed to this machine's existing unit/model.
+    const { unitKey, modelKey } = getPartsCatalogLocation(record);
 
-    // Populate Model selector based on the record's unit
-    populatePartsModelSel(unitKey || '', record.model || '', record._runningSeconds, record);
-
-    // Wire unit selector change
-    unitSel.onchange = () => {
-    populatePartsModelSel(unitSel.value, '', record._runningSeconds, record);
-};
+    renderPartsList(unitKey, modelKey, record._runningSeconds, record, editDraft);
 
     // Store which record we're editing
     editForm.dataset.index = index;
 
     editPopup.style.display = 'grid';
 };
-function populatePartsModelSel(unitKey, preselectedModel, runningSeconds, record) {
-    const modelSel = document.getElementById('parts-model-sel');
-    const partsBody = document.getElementById('parts-tbody');
-
-    const models = unitKey ? (PARTS_CATALOG[unitKey] || {}) : {};
-    const modelKeys = Object.keys(models);
-
-    if (!modelKeys.length) {
-        modelSel.innerHTML = '<option value="">— No models yet —</option>';
-        partsBody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:12px;">No parts data for this unit yet.</td></tr>`;
-        return;
-    }
-
-    modelSel.innerHTML = '<option value="">— Select Model —</option>' +
-        modelKeys.map(m =>
-            `<option value="${m}" ${m.toUpperCase() === preselectedModel.toUpperCase() ? 'selected' : ''}>${m}</option>`
-        ).join('');
-
-    // Auto-render if a model is preselected
-    const matched = modelKeys.find(m => m.toUpperCase() === preselectedModel.toUpperCase());
-    if (matched) {
-        renderPartsList(unitKey, matched, runningSeconds, record);
-    } else {
-        partsBody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:12px;">Select a model to view parts.</td></tr>`;
-    }
-
-    modelSel.onchange = () => {
-        renderPartsList(unitKey, modelSel.value, runningSeconds, record);
-    };
-}
-function renderPartsList(unitKey, modelKey, runningSeconds, record) {
+function renderPartsList(unitKey, modelKey, runningSeconds, record, draftState = null) {
     const partsBody = document.getElementById('parts-tbody');
     if (!unitKey || !modelKey) {
-        partsBody.innerHTML = `<tr><td colspan="2" style="text-align:center;color:var(--muted);padding:12px;">Select a model to view parts.</td></tr>`;
+        partsBody.innerHTML = `<tr><td colspan="2" style="text-align:center;color:var(--muted);padding:12px;">No parts data for this machine.</td></tr>`;
         return;
     }
     const parts = (PARTS_CATALOG[unitKey] || {})[modelKey] || [];
@@ -739,18 +841,50 @@ function renderPartsList(unitKey, modelKey, runningSeconds, record) {
         return;
     }
     const currentHours = (runningSeconds || 0) / 3600;
-    partsBody.innerHTML = parts.map(p => {
-        const s = getPartStatus(currentHours, p, record);
+    const recordIndex = findMachineIndexByRecord(record);
+    const statusRecord = draftState
+        ? {
+            ...record,
+            maintenanceServiceDate: draftState.maintenanceServiceDate || '',
+            partServiceDates: clonePartMap(draftState.partServiceDates),
+            partServiceHours: clonePartMap(draftState.partServiceHours)
+        }
+        : record;
+
+    const maintenanceStatus = getMaintenanceStatus(record.dateInstalled, runningSeconds, statusRecord, 30);
+    let maintenanceBadge = '<span class="parts-badge parts-badge-ok">OK</span>';
+    let maintenanceRowClass = '';
+
+    if (maintenanceStatus.isOverdue) {
+        maintenanceBadge = `<button type="button" class="parts-badge parts-badge-overdue parts-badge-action" title="Mark maintenance as completed today" onclick="markMaintenanceAsServiced(${recordIndex})">OVERDUE</button>`;
+        maintenanceRowClass = 'parts-row-overdue';
+    } else if (maintenanceStatus.isDueSoon) {
+        maintenanceBadge = `<button type="button" class="parts-badge parts-badge-soon parts-badge-action" title="Mark maintenance as completed today" onclick="markMaintenanceAsServiced(${recordIndex})">⚠ DUE SOON</button>`;
+        maintenanceRowClass = 'parts-row-soon';
+    }
+
+    const maintenanceRow = `<tr class="${maintenanceRowClass}">
+        <td class="parts-cell-part">OVERALL MAINTENANCE</td>
+        <td class="parts-cell-status">
+            <div class="parts-status-wrapper">
+                ${maintenanceBadge}
+                <span class="parts-expiry-label">${escapeHtml(maintenanceStatus.label)}</span>
+            </div>
+        </td>
+    </tr>`;
+
+    const partRows = parts.map(p => {
+        const s = getPartStatus(currentHours, p, statusRecord);
         let statusBadge, rowClass = '';
         let displayLabel = s.label;
         
         if (s.isOverdue) {
-            statusBadge = `<span class="parts-badge parts-badge-overdue">OVERDUE</span>`;
+            statusBadge = `<button type="button" class="parts-badge parts-badge-overdue parts-badge-action" title="Mark this part as replaced today" onclick="markPartAsServiced(${recordIndex}, '${encodeURIComponent(p.name)}')">OVERDUE</button>`;
             rowClass = 'parts-row-overdue';
             // Remove "OVERDUE — " prefix from the label since badge already shows it
             displayLabel = s.label.replace(/^OVERDUE —\s*/, '');
         } else if (s.isDueSoon) {
-            statusBadge = `<span class="parts-badge parts-badge-soon">⚠ DUE SOON</span>`;
+            statusBadge = `<button type="button" class="parts-badge parts-badge-soon parts-badge-action" title="Mark this part as replaced today" onclick="markPartAsServiced(${recordIndex}, '${encodeURIComponent(p.name)}')">⚠ DUE SOON</button>`;
             rowClass = 'parts-row-soon';
             // Remove "DUE SOON — " prefix if it exists
             displayLabel = s.label.replace(/^DUE SOON —\s*/, '');
@@ -768,7 +902,65 @@ function renderPartsList(unitKey, modelKey, runningSeconds, record) {
             </td>
          </tr>`;
     }).join('');
+
+    partsBody.innerHTML = maintenanceRow + partRows;
 }
+
+window.markMaintenanceAsServiced = async function(index) {
+    const record = allMachines[index];
+    if (!record || !editDraft || editDraft.index !== index) return;
+
+    const shouldApply = await showConfirmDialog({
+        title: 'Confirm Maintenance Completion',
+        message: 'Mark preventive maintenance as completed today?',
+        confirmText: 'Apply Update',
+        cancelText: 'Cancel',
+        tone: 'warning'
+    });
+    if (!shouldApply) return;
+
+    const todayStr = getTodayDateString();
+    editDraft.maintenanceServiceDate = todayStr;
+
+    const { unitKey, modelKey } = getPartsCatalogLocation(record);
+
+    renderPartsList(unitKey, modelKey, record._runningSeconds || 0, record, editDraft);
+};
+
+window.markPartAsServiced = async function(index, encodedPartName) {
+    const record = allMachines[index];
+    if (!record || !editDraft || editDraft.index !== index) return;
+
+    const partName = decodeURIComponent(encodedPartName || '');
+    if (!partName) return;
+
+    const shouldApply = await showConfirmDialog({
+        title: 'Confirm Part Replacement',
+        message: `Mark "${partName}" as replaced today?`,
+        confirmText: 'Apply Update',
+        cancelText: 'Cancel',
+        tone: 'warning'
+    });
+    if (!shouldApply) return;
+
+    if (!editDraft.partServiceDates || typeof editDraft.partServiceDates !== 'object') {
+        editDraft.partServiceDates = {};
+    }
+    if (!editDraft.partServiceHours || typeof editDraft.partServiceHours !== 'object') {
+        editDraft.partServiceHours = {};
+    }
+
+    // Use current date as the new anchor date for this part.
+    const todayStr = getTodayDateString();
+    syncEditDraftFromInputs();
+
+    editDraft.partServiceDates[partName] = todayStr;
+    editDraft.partServiceHours[partName] = Number(editDraft.runningHours) || ((record._runningSeconds || 0) / 3600);
+
+    const { unitKey, modelKey } = getPartsCatalogLocation(record);
+
+    renderPartsList(unitKey, modelKey, record._runningSeconds || 0, record, editDraft);
+};
 
 // Helper function to prevent XSS
 function escapeHtml(str) {
@@ -783,43 +975,100 @@ function escapeHtml(str) {
     });
 }
 
-closeEditPopup.addEventListener('click', () => {
-    editPopup.style.display = 'none';
+closeEditPopup.addEventListener('click', async () => {
+    await closeEditModal();
 });
 
-editPopup.addEventListener('click', (e) => {
-    if (e.target === editPopup) {
-        editPopup.style.display = 'none';
+if (cancelEditBtn) {
+    cancelEditBtn.addEventListener('click', async () => {
+        await closeEditModal();
+    });
+}
+
+if (confirmOkBtn) {
+    confirmOkBtn.addEventListener('click', () => {
+        resolveConfirmDialog(true);
+    });
+}
+
+if (confirmCancelBtn) {
+    confirmCancelBtn.addEventListener('click', () => {
+        resolveConfirmDialog(false);
+    });
+}
+
+if (confirmOverlay) {
+    confirmOverlay.addEventListener('click', (e) => {
+        if (e.target === confirmOverlay) {
+            resolveConfirmDialog(false);
+        }
+    });
+}
+
+document.addEventListener('keydown', (e) => {
+    if (!confirmOverlay || confirmOverlay.style.display === 'none' || !activeConfirmResolver) return;
+    if (e.key === 'Escape') {
+        e.preventDefault();
+        resolveConfirmDialog(false);
+    }
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        resolveConfirmDialog(true);
     }
 });
 
-editForm.addEventListener('submit', (e) => {
+document.getElementById('edit-runningHours').addEventListener('input', syncEditDraftFromInputs);
+document.getElementById('edit-status').addEventListener('change', syncEditDraftFromInputs);
+document.getElementById('edit-description').addEventListener('input', syncEditDraftFromInputs);
+
+editPopup.addEventListener('click', (e) => {
+    if (e.target === editPopup) {
+        closeEditModal();
+    }
+});
+
+editForm.addEventListener('submit', async (e) => {
     e.preventDefault();
+    syncEditDraftFromInputs();
+
     const index = parseInt(editForm.dataset.index, 10);
     const record = allMachines[index];
     if (!record) return;
 
+    const validation = validateEditFormInputs();
+    if (!validation.valid) {
+        showToast(validation.message, 'warning');
+        return;
+    }
+
+    if (!hasEditDraftChanges()) {
+        showToast('No changes to save.', 'info');
+        return;
+    }
+
+    const confirmSave = await showConfirmDialog({
+        title: 'Save Update?',
+        message: 'Apply these machine updates now?',
+        confirmText: 'Save Update',
+        cancelText: 'Review Again',
+        tone: 'default'
+    });
+    if (!confirmSave) return;
+
     const newRunningHours = parseInt(document.getElementById('edit-runningHours').value, 10) || 0;
     const newStatus = document.getElementById('edit-status').value;
     const newDescription = document.getElementById('edit-description').value;
-    const newHistory = document.getElementById('edit-history').value;
 
     if (!Array.isArray(record.updates)) record.updates = [];
 
-    // Record TODAY as the anchor date for this update.
-    // calculateNextMaintenanceResult will use this date going forward so that
-    // the next maintenance is projected from "now" with the new running hours.
-    const today = new Date();
-    const pad = n => String(n).padStart(2, '0');
-    const todayStr = `${pad(today.getDate())}/${pad(today.getMonth() + 1)}/${today.getFullYear()}`;
+    const todayStr = getTodayDateString();
 
     record.updates.push({
         date: todayStr,
         submittedBy: typeof CURRENT_USER_FULLNAME !== 'undefined' ? CURRENT_USER_FULLNAME : 'Unknown User',
         status: newStatus,
         runningHours: newRunningHours,
-        description: newDescription,
-        history: newHistory
+        description: newDescription
     });
 
     // Apply updated values to the record
@@ -827,9 +1076,20 @@ editForm.addEventListener('submit', (e) => {
     record._runningSeconds = newRunningHours * 3600;
     record.status = newStatus;
     record.description = newDescription;
-    record.history = newHistory;
 
-    editPopup.style.display = 'none';
+    if (editDraft) {
+        record.maintenanceServiceDate = editDraft.maintenanceServiceDate || '';
+        record.partServiceDates = clonePartMap(editDraft.partServiceDates);
+        record.partServiceHours = clonePartMap(editDraft.partServiceHours);
+    }
+
+    // Keep the modal open after saving so user can continue updating parts.
+    // Modal will close only when the user explicitly closes it.
+    editDraft = buildEditDraft(record, index);
+
+    const { unitKey, modelKey } = getPartsCatalogLocation(record);
+
+    renderPartsList(unitKey, modelKey, record._runningSeconds, record, editDraft);
 
     // Re-render — warning icon will disappear automatically if the new
     // maintenance date is now more than 30 days away
@@ -840,10 +1100,10 @@ editForm.addEventListener('submit', (e) => {
         showDetails(index);
     }
 
-    showToast('Record updated successfully.');
+    showToast('Record updated successfully.', 'success');
 });
 
-function showToast(message) {
+function showToast(message, type = 'success') {
     let toast = document.getElementById('update-toast');
     if (!toast) {
         toast = document.createElement('div');
@@ -857,6 +1117,15 @@ function showToast(message) {
         `;
         document.body.appendChild(toast);
     }
+
+    if (type === 'warning') {
+        toast.style.background = '#b45309';
+    } else if (type === 'info') {
+        toast.style.background = '#2a6499';
+    } else {
+        toast.style.background = '#1e7c3a';
+    }
+
     toast.textContent = message;
     toast.style.opacity = '1';
     clearTimeout(toast._timeout);

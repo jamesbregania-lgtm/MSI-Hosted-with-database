@@ -174,13 +174,12 @@ if (clientInput) {
   });
 }
 
-// ════════════════════════════════════════════════════════════════════════════════
-// MODEL AUTOCOMPLETE (live search from PARTS_CATALOG)
-// ════════════════════════════════════════════════════════════════════════════════
 
-const modelInput = document.getElementById('modelInput');
+
+const modelInput = document.getElementById('model');
 const modelDropdown = document.getElementById('modelDropdown');
 const unitSelect = document.getElementById('unit');
+const assetForm = document.getElementById('assetForm');
 
 let filteredModels = [];
 let modelFocusedIndex = -1;
@@ -188,6 +187,44 @@ let modelFocusedIndex = -1;
 function getAvailableModels(unitKey) {
   if (!PARTS_CATALOG[unitKey]) return [];
   return Object.keys(PARTS_CATALOG[unitKey]).filter(m => PARTS_CATALOG[unitKey][m].length > 0);
+}
+
+function getAvailableModelsForSelectedUnit() {
+  const selectedUnit = (unitSelect?.value || '').trim();
+  return getAvailableModels(selectedUnit);
+}
+
+function isValidModelForSelectedUnit(modelValue) {
+  const normalized = (modelValue || '').trim().toUpperCase();
+  if (!normalized) return false;
+  const availableModels = getAvailableModelsForSelectedUnit();
+  if (!availableModels.length) return true;
+  return availableModels.some(m => m.toUpperCase() === normalized);
+}
+
+function applyModelValidation() {
+  if (!modelInput) return true;
+  const value = (modelInput.value || '').trim().toUpperCase();
+  modelInput.value = value;
+
+  const availableModels = getAvailableModelsForSelectedUnit();
+  if (!value) {
+    modelInput.setCustomValidity('Please enter a model.');
+    return false;
+  }
+
+  if (!availableModels.length) {
+    modelInput.setCustomValidity('No available models for the selected unit.');
+    return false;
+  }
+
+  if (!isValidModelForSelectedUnit(value)) {
+    modelInput.setCustomValidity('Invalid model for the selected unit.');
+    return false;
+  }
+
+  modelInput.setCustomValidity('');
+  return true;
 }
 
 function renderModelDropdown(items) {
@@ -225,6 +262,7 @@ function closeModelDropdown() {
 function setSelectedModel(model) {
   if (!model) return;
   modelInput.value = model.toUpperCase();
+  modelInput.setCustomValidity('');
   closeModelDropdown();
 }
 
@@ -247,8 +285,14 @@ function filterModels(value) {
 }
 
 if (modelInput) {
+  if (modelInput.value) {
+    modelInput.value = modelInput.value.toUpperCase();
+  }
+
   modelInput.addEventListener('input', (event) => {
-    const query = event.target.value;
+    const query = event.target.value.toUpperCase();
+    event.target.value = query;
+    modelInput.setCustomValidity('');
     if (query.trim().length === 0) {
       closeModelDropdown();
     } else {
@@ -307,6 +351,23 @@ if (modelInput) {
 
   unitSelect.addEventListener('change', () => {
     modelInput.value = '';
+    modelInput.setCustomValidity('');
     closeModelDropdown();
+  });
+
+  modelInput.addEventListener('blur', () => {
+    if (modelInput.value.trim()) {
+      applyModelValidation();
+    }
+  });
+}
+
+if (assetForm) {
+  assetForm.addEventListener('submit', (event) => {
+    const modelOk = applyModelValidation();
+    if (!modelOk) {
+      event.preventDefault();
+      modelInput.reportValidity();
+    }
   });
 }
