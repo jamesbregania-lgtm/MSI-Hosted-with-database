@@ -1,6 +1,8 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const accounts = require('../data/accounts');
+const {
+  findActiveAccountByUsername
+} = require('../database/accounts.store');
 
 const router = express.Router();
 
@@ -22,33 +24,41 @@ router.get('/login', (req, res) => {
 });
 
 router.post('/login', async (req, res) => {
-  const { username, password } = req.body;
+  try {
+    const username = String(req.body.username || '').trim().toLowerCase();
+    const password = String(req.body.password || '');
 
-  const found = accounts.find(
-    acc => acc.username === username && acc.status !== 'inactive'
-  );
+    const found = await findActiveAccountByUsername(username);
 
-  if (!found) {
-    return res.render('login', { error: 'Invalid credentials or account is inactive.' });
+    if (!found) {
+      return res.render('login', { error: 'Invalid credentials or account is inactive.' });
+    }
+
+    const isMatch = await bcrypt.compare(password, found.passwordHash);
+
+    if (!isMatch) {
+      return res.render('login', { error: 'Invalid credentials or account is inactive.' });
+    }
+
+    req.session.user = {
+      username: found.username,
+      role: found.role,
+      fullName: found.fullName,
+      department: found.department,
+      branch: found.branch
+    };
+
+    await new Promise((resolve, reject) => {
+      req.session.save(err => (err ? reject(err) : resolve()));
+    });
+
+    return found.role === 'admin'
+      ? res.redirect('/admin_account')
+      : res.redirect('/user_account');
+  } catch (error) {
+    console.error('Login error:', error);
+    return res.render('login', { error: 'Login failed. Please try again.' });
   }
-
-  const isMatch = await bcrypt.compare(password, found.passwordHash);
-
-  if (!isMatch) {
-    return res.render('login', { error: 'Invalid credentials or account is inactive.' });
-  }
-
-  req.session.user = {
-    username: found.username,
-    role: found.role,
-    fullName: found.fullName,
-    department: found.department,
-    branch: found.branch
-  };
-
-  return found.role === 'admin'
-    ? res.redirect('/admin_account')
-    : res.redirect('/user_account');
 });
 
 router.get('/logout', (req, res) => {

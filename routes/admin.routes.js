@@ -1,6 +1,13 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const accounts = require('../data/accounts');
+const {
+  listUserAccounts,
+  usernameExists,
+  createUserAccount,
+  updateUserAccount,
+  resetUserPassword,
+  setUserStatus
+} = require('../database/accounts.store');
 const clients = require('../data/clients');
 const { requireAdmin } = require('../middleware/auth');
 
@@ -25,9 +32,8 @@ function slugify(value = '') {
     .replace(/^-+|-+$/g, '');
 }
 
-function renderAdmin(req, res, { success = null, error = null } = {}) {
-  const userAccounts = accounts
-    .filter(a => a.role === 'user')
+async function renderAdmin(req, res, { success = null, error = null } = {}) {
+  const userAccounts = (await listUserAccounts())
     .slice()
     .sort((a, b) => a.fullName.localeCompare(b.fullName));
   const sortedClients = clients.slice().sort((a, b) => a.name.localeCompare(b.name));
@@ -42,7 +48,7 @@ function renderAdmin(req, res, { success = null, error = null } = {}) {
 }
 
 router.get('/', requireAdmin, (req, res) => {
-  renderAdmin(req, res);
+  return renderAdmin(req, res);
 });
 
 router.post('/employees/create', requireAdmin, async (req, res) => {
@@ -54,30 +60,30 @@ router.post('/employees/create', requireAdmin, async (req, res) => {
   branch = properCase(branch || '');
 
   if (!usernameRegex.test(username)) {
-    return renderAdmin(req, res, {
+    return await renderAdmin(req, res, {
       error: 'Username must be 4-20 characters using lowercase letters and underscore only.',
       modal: 'create-employee'
     });
   }
 
   if (!passwordRegex.test(password || '')) {
-    return renderAdmin(req, res, {
+    return await renderAdmin(req, res, {
       error: 'Password must be at least 8 characters long.',
       modal: 'create-employee'
     });
   }
 
   if (!nameRegex.test(fullName)) {
-    return renderAdmin(req, res, {
+    return await renderAdmin(req, res, {
       error: 'Full name must contain letters and spaces only.'
     });
   }
 
-  if (accounts.some(acc => acc.username === username)) {
-    return renderAdmin(req, res, { error: 'Username already exists.' });
+  if (await usernameExists(username)) {
+    return await renderAdmin(req, res, { error: 'Username already exists.' });
   }
 
-  accounts.push({
+  await createUserAccount({
     username,
     passwordHash: await bcrypt.hash(password, 10),
     role: 'user',
@@ -87,73 +93,73 @@ router.post('/employees/create', requireAdmin, async (req, res) => {
     status: 'active'
   });
 
-  return renderAdmin(req, res, { success: 'Employee account created successfully.' });
+  return await renderAdmin(req, res, { success: 'Employee account created successfully.' });
 });
 
-router.post('/employees/update', requireAdmin, (req, res) => {
+router.post('/employees/update', requireAdmin, async (req, res) => {
   const { username } = req.body;
-  const target = accounts.find(acc => acc.username === username && acc.role === 'user');
-
-  if (!target) {
-    return renderAdmin(req, res, { error: 'Employee account not found.' });
-  }
 
   const fullName = properCase(req.body.fullName || '');
   const department = String(req.body.department || '').trim().toUpperCase();
   const branch = properCase(req.body.branch || '');
 
   if (!nameRegex.test(fullName)) {
-    return renderAdmin(req, res, { error: 'Invalid full name.' });
+    return await renderAdmin(req, res, { error: 'Invalid full name.' });
   }
 
-  target.fullName = fullName;
-  target.department = department;
-  target.branch = branch;
+  const updated = await updateUserAccount(username, {
+    fullName,
+    department,
+    branch
+  });
 
-  return renderAdmin(req, res, { success: 'Employee account updated successfully.' });
+  if (!updated) {
+    return await renderAdmin(req, res, { error: 'Employee account not found.' });
+  }
+
+  return await renderAdmin(req, res, { success: 'Employee account updated successfully.' });
 });
 
 router.post('/employees/reset-password', requireAdmin, async (req, res) => {
   const { username, newPassword } = req.body;
-  const target = accounts.find(acc => acc.username === username && acc.role === 'user');
-
-  if (!target) {
-    return renderAdmin(req, res, { error: 'Employee account not found.' });
-  }
 
   if (!passwordRegex.test(newPassword || '')) {
-    return renderAdmin(req, res, {
+    return await renderAdmin(req, res, {
       error: 'New password must be at least 8 characters long.'
     });
   }
 
-  target.passwordHash = await bcrypt.hash(newPassword, 10);
-  return renderAdmin(req, res, { success: 'Password reset successfully.' });
-});
+  const updated = await resetUserPassword(username, await bcrypt.hash(newPassword, 10));
 
-router.post('/employees/toggle', requireAdmin, (req, res) => {
-  const { username, status } = req.body;
-  const target = accounts.find(acc => acc.username === username && acc.role === 'user');
-
-  if (!target) {
-    return renderAdmin(req, res, { error: 'Employee account not found.' });
+  if (!updated) {
+    return await renderAdmin(req, res, { error: 'Employee account not found.' });
   }
 
-  target.status = status === 'inactive' ? 'inactive' : 'active';
-  return renderAdmin(req, res, { success: 'Employee status updated successfully.' });
+  return await renderAdmin(req, res, { success: 'Password reset successfully.' });
 });
 
-router.post('/clients/create', requireAdmin, (req, res) => {
+router.post('/employees/toggle', requireAdmin, async (req, res) => {
+  const { username, status } = req.body;
+  const updated = await setUserStatus(username, status === 'inactive' ? 'inactive' : 'active');
+
+  if (!updated) {
+    return await renderAdmin(req, res, { error: 'Employee account not found.' });
+  }
+
+  return await renderAdmin(req, res, { success: 'Employee status updated successfully.' });
+});
+
+router.post('/clients/create', requireAdmin, async (req, res) => {
   const clientName = properCase(req.body.clientName || '');
   const location = properCase(req.body.location || '');
   const id = slugify(clientName);
 
   if (!clientName) {
-    return renderAdmin(req, res, { error: 'Client name is required.' });
+    return await renderAdmin(req, res, { error: 'Client name is required.' });
   }
 
   if (clients.some(c => c.id === id)) {
-    return renderAdmin(req, res, { error: 'Client already exists.' });
+    return await renderAdmin(req, res, { error: 'Client already exists.' });
   }
 
   clients.push({
@@ -166,12 +172,12 @@ router.post('/clients/create', requireAdmin, (req, res) => {
   return res.redirect('/admin_account#clients');
 });
 
-router.post('/clients/update', requireAdmin, (req, res) => {
+router.post('/clients/update', requireAdmin, async (req, res) => {
   const { clientId } = req.body;
   const target = clients.find(c => c.id === clientId);
 
   if (!target) {
-    return renderAdmin(req, res, { error: 'Client not found.' });
+    return await renderAdmin(req, res, { error: 'Client not found.' });
   }
 
   target.name = properCase(req.body.clientName || '');
@@ -180,12 +186,12 @@ router.post('/clients/update', requireAdmin, (req, res) => {
   return res.redirect('/admin_account#clients');
 });
 
-router.post('/clients/toggle', requireAdmin, (req, res) => {
+router.post('/clients/toggle', requireAdmin, async (req, res) => {
   const { clientId, status } = req.body;
   const target = clients.find(c => c.id === clientId);
 
   if (!target) {
-    return renderAdmin(req, res, { error: 'Client not found.' });
+    return await renderAdmin(req, res, { error: 'Client not found.' });
   }
 
   target.status = status === 'inactive' ? 'inactive' : 'active';

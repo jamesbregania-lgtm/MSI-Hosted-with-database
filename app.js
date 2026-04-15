@@ -10,6 +10,9 @@ const assetRoutes = require('./routes/asset.routes');
 
 const app = express();
 
+// Render runs behind a reverse proxy; trust it so secure cookies work.
+app.set('trust proxy', 1);
+
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(sessionMiddleware);
