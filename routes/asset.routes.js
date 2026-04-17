@@ -5,9 +5,21 @@ const {
   findActiveClientByName
 } = require('../database/clients.store');
 const { addMachine } = require('../database/machines.store');
+const { listUserAccounts } = require('../database/accounts.store');
 const { requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
+
+function normalizeTechnicianName(name) {
+  return String(name || '').trim().replace(/\s+/g, ' ');
+}
+
+function splitTechnicianNames(value) {
+  return String(value || '')
+    .split(',')
+    .map(normalizeTechnicianName)
+    .filter(Boolean);
+}
 
 // Parts catalog with all models and their parts
 const PARTS_CATALOG = {
@@ -57,11 +69,21 @@ router.get('/new-machine', requireAuth, async (req, res) => {
   const activeClients = (await listActiveClients())
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name));
+  const userAccounts = await listUserAccounts();
+  const currentFullName = String(req.session?.user?.fullName || '').trim().toLowerCase();
+  const teamMembers = userAccounts
+    .filter(account => account.status === 'active')
+    .map(account => account.fullName)
+    .filter(Boolean)
+    .filter(name => String(name).trim().toLowerCase() !== currentFullName)
+    .filter((name, index, arr) => arr.indexOf(name) === index)
+    .sort((a, b) => a.localeCompare(b));
   const selectedClientId = req.query.clientId || '';
 
   res.render('user_asset_form', {
     currentUser: req.session.user,
     clients: activeClients,
+    teamMembers,
     selectedClientId,
     success: null,
     error: null,
@@ -72,7 +94,20 @@ router.get('/new-machine', requireAuth, async (req, res) => {
 
 router.post('/new-machine', requireAuth, async (req, res) => {
   const activeClients = await listActiveClients();
+  const userAccounts = await listUserAccounts();
+  const currentFullName = String(req.session?.user?.fullName || '').trim().toLowerCase();
+  const teamMembers = userAccounts
+    .filter(account => account.status === 'active')
+    .map(account => account.fullName)
+    .filter(Boolean)
+    .filter(name => String(name).trim().toLowerCase() !== currentFullName)
+    .filter((name, index, arr) => arr.indexOf(name) === index)
+    .sort((a, b) => a.localeCompare(b));
   let { clientId, unit, model, serialNo, dateInstalled, runningHours, status, description } = req.body;
+  const problem = String(req.body.problem || '').trim();
+  const action = String(req.body.action || '').trim();
+  const recommendation = String(req.body.recommendation || '').trim();
+  const techniciansInput = String(req.body.technicians || '');
 
   clientId = String(clientId || '').trim().toLowerCase();
 
@@ -93,6 +128,7 @@ router.post('/new-machine', requireAuth, async (req, res) => {
     return res.render('user_asset_form', {
       currentUser: req.session.user,
       clients: activeClients,
+      teamMembers,
       selectedClientId: clientId || '',
       success: null,
       error: 'No available models for the selected unit.',
@@ -106,6 +142,7 @@ router.post('/new-machine', requireAuth, async (req, res) => {
     return res.render('user_asset_form', {
       currentUser: req.session.user,
       clients: activeClients,
+      teamMembers,
       selectedClientId: clientId || '',
       success: null,
       error: 'Invalid model for the selected unit.',
@@ -134,6 +171,7 @@ router.post('/new-machine', requireAuth, async (req, res) => {
     return res.render('user_asset_form', {
       currentUser: req.session.user,
       clients: activeClients,
+      teamMembers,
       selectedClientId: clientId || '',
       success: null,
       error: 'Please fill in all required fields (Client, Unit, Model, Serial No, Date Installed, Running Hours, Status).',
@@ -175,11 +213,30 @@ router.post('/new-machine', requireAuth, async (req, res) => {
       : 'Unknown User'
   };
 
+  const submittedBy = normalizeTechnicianName(asset.submittedBy) || 'Unknown User';
+  const additionalTechnicians = splitTechnicianNames(techniciansInput)
+    .filter((name, idx, arr) => arr.findIndex(v => v.toLowerCase() === name.toLowerCase()) === idx)
+    .filter(name => name.toLowerCase() !== submittedBy.toLowerCase());
+
+  asset.reports = [
+    {
+      date: installedDate,
+      submittedBy,
+      updateIndex: null,
+      technicians: [submittedBy, ...additionalTechnicians]
+        .filter((name, idx, arr) => arr.findIndex(v => v.toLowerCase() === name.toLowerCase()) === idx),
+      problem,
+      action,
+      recommendation
+    }
+  ];
+
   await addMachine(asset);
 
   res.render('user_asset_form', {
     currentUser: req.session.user,
     clients: activeClients,
+    teamMembers,
     selectedClientId: clientId,
     success: 'Printer asset request submitted successfully.',
     error: null,

@@ -4,6 +4,12 @@ let currentDetailIndex = null;
 let currentPage = 1;
 const PAGE_SIZE = 10;
 
+function orderMachinesNewestFirst(records) {
+    if (!Array.isArray(records)) return [];
+    // New machine entries are appended in storage; reverse to show newest at top.
+    return records.slice().reverse();
+}
+
 const client = CLIENTS.find(c => c.id.toLowerCase() === decodeURIComponent(CLIENT_ID).toLowerCase());
 
 function displayClientData() {
@@ -22,7 +28,7 @@ function displayClientData() {
     document.getElementById('profile-location').textContent = client.location || 'N/A';
     document.getElementById('profile-avatar').textContent = client.name.charAt(0).toUpperCase();
 
-    allMachines = Array.isArray(MACHINE_RECORDS) ? MACHINE_RECORDS : [];
+    allMachines = orderMachinesNewestFirst(MACHINE_RECORDS);
     document.getElementById('machine-count').textContent = allMachines.length;
     filteredMachines = allMachines;
     currentPage = 1;
@@ -59,7 +65,7 @@ async function refreshMachinesFromServer() {
             return;
         }
 
-        allMachines = payload.machineRecords;
+        allMachines = orderMachinesNewestFirst(payload.machineRecords);
         filteredMachines = allMachines;
         currentPage = 1;
         document.getElementById('machine-count').textContent = allMachines.length;
@@ -686,21 +692,169 @@ function buildHistoryRows(record) {
         date: record.dateInstalled,
         tech: record.submittedBy || 'Unknown User',
         status: record.status || '—',
-        isOriginal: true
+        isOriginal: true,
+        machineIndex: -1
     });
     // Additional updates
     if (Array.isArray(record.updates)) {
-        record.updates.forEach(u => {
+        record.updates.forEach((u, updateIndex) => {
             rows.push({
                 date: u.date || '—',
                 tech: u.submittedBy || 'Unknown User',
                 status: u.status || '—',
                 isOriginal: false,
-                detail: u
+                detail: u,
+                machineIndex: updateIndex
             });
         });
     }
-    return rows;
+    // Newest updates should appear first in Machine History Records.
+    return rows.reverse();
+}
+
+function toDateKey(dateStr) {
+    const raw = String(dateStr || '').trim();
+    if (!raw) return '';
+
+    const dmyMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (dmyMatch) {
+        const day = String(parseInt(dmyMatch[1], 10)).padStart(2, '0');
+        const month = String(parseInt(dmyMatch[2], 10)).padStart(2, '0');
+        return `${dmyMatch[3]}-${month}-${day}`;
+    }
+
+    const ymdMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (ymdMatch) {
+        return `${ymdMatch[1]}-${ymdMatch[2]}-${ymdMatch[3]}`;
+    }
+
+    const parsed = new Date(raw);
+    if (!Number.isNaN(parsed.getTime())) {
+        const yyyy = parsed.getFullYear();
+        const mm = String(parsed.getMonth() + 1).padStart(2, '0');
+        const dd = String(parsed.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+    }
+
+    return raw;
+}
+
+function getChangedPartNames(beforeDates, afterDates) {
+    const before = beforeDates && typeof beforeDates === 'object' ? beforeDates : {};
+    const after = afterDates && typeof afterDates === 'object' ? afterDates : {};
+
+    return Object.keys(after).filter(name => String(after[name] || '') !== String(before[name] || ''));
+}
+
+function getMaintenanceAndPartUpdates(record, row, rowIndex) {
+    const result = [];
+    const updateDetail = row && row.detail ? row.detail : null;
+
+    if (row && row.isOriginal) {
+        return ['UNIT INSTALLATION'];
+    }
+
+    if (updateDetail && Array.isArray(updateDetail.partsUpdated) && updateDetail.partsUpdated.length) {
+        updateDetail.partsUpdated.forEach(name => result.push(String(name)));
+    } else if (updateDetail && Array.isArray(record.updates) && row.machineIndex >= 0) {
+        const currentUpdate = record.updates[row.machineIndex] || {};
+        const previousUpdate = record.updates[row.machineIndex - 1] || {};
+        const changedBySnapshot = getChangedPartNames(previousUpdate.partServiceDates, currentUpdate.partServiceDates);
+        changedBySnapshot.forEach(name => result.push(String(name)));
+    }
+
+    const maintenanceUpdated = !!(updateDetail && updateDetail.maintenanceUpdated);
+    if (maintenanceUpdated) {
+        result.unshift('MAINTENANCE');
+    }
+
+    const unique = result
+        .map(name => String(name || '').trim())
+        .filter(Boolean)
+        .filter((name, idx, arr) => arr.findIndex(v => v.toLowerCase() === name.toLowerCase()) === idx);
+
+    // Fallback for older records with no per-update part metadata.
+    if (!unique.length && row && row.machineIndex === (Array.isArray(record.updates) ? record.updates.length - 1 : -1)) {
+        const todayKey = toDateKey(row.date);
+        const maintenanceDateKey = toDateKey(record.maintenanceServiceDate);
+
+        if (todayKey && maintenanceDateKey && todayKey === maintenanceDateKey) {
+            unique.push('MAINTENANCE');
+        }
+
+        const partDates = record.partServiceDates && typeof record.partServiceDates === 'object' ? record.partServiceDates : {};
+        Object.keys(partDates).forEach(partName => {
+            if (toDateKey(partDates[partName]) === todayKey) {
+                unique.push(partName);
+            }
+        });
+    }
+
+    return unique;
+}
+
+function findReportForHistoryRow(record, row) {
+    if (!record) return null;
+    if (!Array.isArray(record.reports) || !record.reports.length) return null;
+
+    if (row.isOriginal) {
+        const installReport = record.reports.find(r => r && (r.updateIndex === null || r.updateIndex === undefined));
+        if (installReport) return installReport;
+
+        const installDateKey = toDateKey(record.dateInstalled);
+        const byDate = record.reports.find(r => toDateKey(r && r.date) === installDateKey);
+        if (byDate) return byDate;
+
+        return record.reports[0] || null;
+    }
+
+    const updateDetail = row.detail || {};
+    if (updateDetail.report && typeof updateDetail.report === 'object') {
+        return updateDetail.report;
+    }
+
+    if (Number.isInteger(row.machineIndex) && row.machineIndex >= 0) {
+        const direct = record.reports.find(r => Number(r.updateIndex) === row.machineIndex);
+        if (direct) return direct;
+    }
+
+    if (Number.isInteger(row.machineIndex) && row.machineIndex >= 0 && record.reports[row.machineIndex]) {
+        return record.reports[row.machineIndex];
+    }
+
+    const rowDateKey = toDateKey(row.date);
+    const rowTech = normalizeTechnicianName(row.tech || '').toLowerCase();
+
+    for (let i = record.reports.length - 1; i >= 0; i -= 1) {
+        const candidate = record.reports[i] || {};
+        const reportDateKey = toDateKey(candidate.date);
+        const reportTech = normalizeTechnicianName(candidate.submittedBy || '').toLowerCase();
+        if (reportDateKey && rowDateKey && reportDateKey === rowDateKey && (!rowTech || rowTech === reportTech)) {
+            return candidate;
+        }
+    }
+
+    return null;
+}
+
+function setReportViewText(id, value, { preserveBreaks = false } = {}) {
+    const el = document.getElementById(id);
+    if (!el) return;
+
+    const text = String(value || '').trim();
+    if (!text) {
+        el.textContent = '—';
+        el.classList.add('report-view-empty');
+        return;
+    }
+
+    el.classList.remove('report-view-empty');
+
+    if (preserveBreaks) {
+        el.innerHTML = escapeHtml(text).replace(/\n/g, '<br>');
+    } else {
+        el.textContent = text;
+    }
 }
 
 //  History modal ─
@@ -715,13 +869,29 @@ function openHistoryModal(index) {
 
     const rows = buildHistoryRows(record);
 
-    historyList.innerHTML = rows.map((row) => `
-        <tr>
+    historyList.innerHTML = rows.map((row, rowIndex) => `
+        <tr class="history-record-row" data-machine-index="${index}" data-row-index="${rowIndex}" tabindex="0" role="button" aria-label="View report for ${formatDateDisplay(row.date)}">
             <td>${formatDateDisplay(row.date)}</td>
             <td class="history-tech-cell">${formatTechnicianLines(row.tech)}</td>
             <td>${row.status}</td>
         </tr>
     `).join('');
+
+    historyList.querySelectorAll('.history-record-row').forEach(rowEl => {
+        rowEl.addEventListener('click', () => {
+            const machineIndex = Number(rowEl.dataset.machineIndex);
+            const targetRowIndex = Number(rowEl.dataset.rowIndex);
+            openHistoryReportModal(machineIndex, targetRowIndex);
+        });
+
+        rowEl.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            const machineIndex = Number(rowEl.dataset.machineIndex);
+            const targetRowIndex = Number(rowEl.dataset.rowIndex);
+            openHistoryReportModal(machineIndex, targetRowIndex);
+        });
+    });
 
     historyPopup.style.display = 'grid';
 }
@@ -735,6 +905,96 @@ historyPopup.addEventListener('click', (e) => {
         historyPopup.style.display = 'none';
     }
 });
+
+const historyReportPopup = document.getElementById('historyReportPopup');
+const closeHistoryReportPopup = document.getElementById('closeHistoryReportPopup');
+
+function closeHistoryReportModal() {
+    if (!historyReportPopup) return;
+    historyReportPopup.style.display = 'none';
+}
+
+function openHistoryReportModal(machineIndex, rowIndex) {
+    const record = allMachines[machineIndex];
+    if (!record) return;
+
+    const rows = buildHistoryRows(record);
+    const row = rows[rowIndex];
+    if (!row) return;
+
+    const report = findReportForHistoryRow(record, row);
+    const updateDetail = row.detail || {};
+    const runningHours = row.isOriginal
+        ? (Number(record.runningHours) || 0)
+        : (Number(updateDetail.runningHours) || 0);
+
+    const maintenanceAndParts = getMaintenanceAndPartUpdates(record, row, rowIndex);
+    const maintenanceAndPartsList = document.getElementById('history-report-maintenance-parts-list');
+
+    setReportViewText('history-report-date', formatDateDisplay(row.date));
+    const submittedSource = report && report.submittedBy
+        ? report.submittedBy
+        : (row.tech || 'Unknown User');
+    const submittedParts = splitTechnicianNames(submittedSource);
+    const submittedByForView = submittedParts[0] || normalizeTechnicianName(submittedSource) || 'Unknown User';
+
+    setReportViewText('history-report-submitted-by', submittedByForView);
+    setReportViewText('history-report-unit', record.unit || '—');
+    setReportViewText('history-report-model', record.model || '—');
+    setReportViewText('history-report-serial', record.serialNo || '—');
+    setReportViewText('history-report-running-hours', `${runningHours} hrs`);
+    setReportViewText('history-report-status', row.isOriginal ? (record.status || '—') : (updateDetail.status || row.status || '—'));
+    setReportViewText('history-report-description', row.isOriginal ? (record.description || '') : (updateDetail.description || ''), { preserveBreaks: true });
+
+    if (maintenanceAndPartsList) {
+        if (!maintenanceAndParts.length) {
+            maintenanceAndPartsList.innerHTML = '<li class="report-view-empty">No maintenance or parts updates recorded.</li>';
+        } else {
+            maintenanceAndPartsList.innerHTML = maintenanceAndParts
+                .map(item => `<li>${escapeHtml(item)}</li>`)
+                .join('');
+        }
+    }
+
+    if (report) {
+        const submittedNames = splitTechnicianNames(report.submittedBy || '');
+        const submittedPrimary = submittedNames[0] || '';
+        const legacyTechnicians = submittedNames.slice(1);
+        const savedTechnicians = Array.isArray(report.technicians)
+            ? report.technicians.flatMap(name => splitTechnicianNames(name))
+            : [];
+        const allTechnicians = [submittedPrimary, ...legacyTechnicians, ...savedTechnicians]
+            .filter(Boolean)
+            .filter((name, idx, arr) => arr.findIndex(v => v.toLowerCase() === name.toLowerCase()) === idx);
+        const techniciansText = allTechnicians.join(', ');
+
+        setReportViewText('history-report-technicians', techniciansText);
+        setReportViewText('history-report-problem', report.problem || '', { preserveBreaks: true });
+        setReportViewText('history-report-action', report.action || '', { preserveBreaks: true });
+        setReportViewText('history-report-recommendation', report.recommendation || '', { preserveBreaks: true });
+    } else {
+        setReportViewText('history-report-technicians', '');
+        setReportViewText('history-report-problem', '', { preserveBreaks: true });
+        setReportViewText('history-report-action', '', { preserveBreaks: true });
+        setReportViewText('history-report-recommendation', '', { preserveBreaks: true });
+    }
+
+    if (historyReportPopup) {
+        historyReportPopup.style.display = 'grid';
+    }
+}
+
+if (closeHistoryReportPopup) {
+    closeHistoryReportPopup.addEventListener('click', closeHistoryReportModal);
+}
+
+if (historyReportPopup) {
+    historyReportPopup.addEventListener('click', (event) => {
+        if (event.target === historyReportPopup) {
+            closeHistoryReportModal();
+        }
+    });
+}
 
 //  Edit / Update modal ─
 
@@ -1154,18 +1414,31 @@ editForm.addEventListener('submit', async (e) => {
     const newRunningHours = parseInt(document.getElementById('edit-runningHours').value, 10) || 0;
     const newStatus = document.getElementById('edit-status').value;
     const newDescription = document.getElementById('edit-description').value;
+    const previousMaintenanceServiceDate = String(record.maintenanceServiceDate || '');
+    const previousPartServiceDates = clonePartMap(record.partServiceDates);
 
     if (!Array.isArray(record.updates)) record.updates = [];
 
     const todayStr = getTodayDateString();
+    const nextMaintenanceServiceDate = editDraft ? String(editDraft.maintenanceServiceDate || '') : '';
+    const nextPartServiceDates = editDraft ? clonePartMap(editDraft.partServiceDates) : {};
+    const changedParts = getChangedPartNames(previousPartServiceDates, nextPartServiceDates);
+    const maintenanceUpdated = previousMaintenanceServiceDate !== nextMaintenanceServiceDate;
 
-    record.updates.push({
+    const updateEntry = {
         date: todayStr,
         submittedBy: typeof CURRENT_USER_FULLNAME !== 'undefined' ? CURRENT_USER_FULLNAME : 'Unknown User',
         status: newStatus,
         runningHours: newRunningHours,
-        description: newDescription
-    });
+        description: newDescription,
+        maintenanceUpdated,
+        maintenanceServiceDate: nextMaintenanceServiceDate,
+        partsUpdated: changedParts,
+        partServiceDates: nextPartServiceDates,
+        partServiceHours: editDraft ? clonePartMap(editDraft.partServiceHours) : {}
+    };
+
+    record.updates.push(updateEntry);
 
     // Apply updated values to the record
     record.runningHours = newRunningHours;
@@ -1227,7 +1500,7 @@ editForm.addEventListener('submit', async (e) => {
         showToast('Record updated successfully.', 'success');
 
         // Open the Add Report popup
-        openReportPopup(record, index);
+        openReportPopup(record, index, record.updates.length - 1);
     } catch (error) {
         showToast(error.message || 'Failed to save updates.', 'warning');
     }
@@ -1264,6 +1537,13 @@ function showToast(message, type = 'success') {
 
 function normalizeTechnicianName(name) {
     return String(name || '').trim().replace(/\s+/g, ' ');
+}
+
+function splitTechnicianNames(value) {
+    return String(value || '')
+        .split(',')
+        .map(normalizeTechnicianName)
+        .filter(Boolean);
 }
 
 function abbreviateTechnicianName(name) {
@@ -1374,6 +1654,7 @@ function parseTechnicianInput(rawValue) {
 //  Add Report Popup Logic 
 
 let currentReportRecordIndex = null;
+let currentReportUpdateIndex = null;
 
 const reportPopup      = document.getElementById('reportPopup');
 const closeReportPopupBtn = document.getElementById('closeReportPopup');
@@ -1440,10 +1721,11 @@ function renderReportTechDropdown() {
     });
 }
 
-function openReportPopup(record, index) {
+function openReportPopup(record, index, updateIndex) {
     if (!reportPopup) return;
 
     currentReportRecordIndex = index;
+    currentReportUpdateIndex = Number.isInteger(updateIndex) ? updateIndex : null;
 
     // Close the edit modal immediately — save already succeeded, no discard prompt needed
     if (editPopup) editPopup.style.display = 'none';
@@ -1475,6 +1757,7 @@ function openReportPopup(record, index) {
 function closeReportModal() {
     if (reportPopup) reportPopup.style.display = 'none';
     currentReportRecordIndex = null;
+    currentReportUpdateIndex = null;
     closeReportTechDropdown();
 }
 
@@ -1578,11 +1861,10 @@ if (reportForm) {
         const reporterName = normalizeTechnicianName(
             typeof CURRENT_USER_FULLNAME !== 'undefined' ? CURRENT_USER_FULLNAME : 'Unknown User'
         );
-        const technicians = [reporterName, ...additionalTechnicians]
+        const submittedBy = splitTechnicianNames(reporterName)[0] || reporterName || 'Unknown User';
+        const technicians = [submittedBy, ...additionalTechnicians]
             .filter(Boolean)
             .filter((name, idx, arr) => arr.findIndex(v => v.toLowerCase() === name.toLowerCase()) === idx);
-
-        const submittedBy = technicians.join(', ');
 
         if (!problem || !action || !recommendation) {
             showToast('Problem, Action, and Recommendation fields are required.', 'warning');
@@ -1597,14 +1879,19 @@ if (reportForm) {
             technicians,
             problem,
             action,
-            recommendation
+            recommendation,
+            updateIndex: Number.isInteger(currentReportUpdateIndex) ? currentReportUpdateIndex : null
         };
 
         if (!Array.isArray(record.reports)) record.reports = [];
         record.reports.push(reportEntry);
 
-        if (Array.isArray(record.updates) && record.updates.length > 0) {
+        if (Array.isArray(record.updates) && Number.isInteger(currentReportUpdateIndex) && record.updates[currentReportUpdateIndex]) {
+            record.updates[currentReportUpdateIndex].submittedBy = submittedBy;
+            record.updates[currentReportUpdateIndex].report = reportEntry;
+        } else if (Array.isArray(record.updates) && record.updates.length > 0) {
             record.updates[record.updates.length - 1].submittedBy = submittedBy;
+            record.updates[record.updates.length - 1].report = reportEntry;
         }
 
         try {
@@ -1615,6 +1902,7 @@ if (reportForm) {
                     serialNo:      record.serialNo,
                     model:         record.model,
                     dateInstalled: record.dateInstalled,
+                    updateIndex:   Number.isInteger(currentReportUpdateIndex) ? currentReportUpdateIndex : null,
                     report:        reportEntry
                 })
             });

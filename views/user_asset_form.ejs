@@ -49,86 +49,162 @@
                 </a>
             </div>
         </nav>
-        <div class="card">
-            <div class="card-header">
-                <div>
-                    <h2>Printer Asset Form</h2>
-                    <p>Choose a client and fill in the unit details.</p>
+        
+        <% if (success) { %>
+        <div class="flash flash-success" id="flashMsg"><%= success %></div>
+        <% } %>
+        <% if (error) { %>
+        <div class="flash flash-error" id="flashMsg"><%= error %></div>
+        <% } %>
+
+        <form id="assetForm" action="/user_account/new-machine" method="POST">
+
+            <!-- ── Section 1: Machine Info ── -->
+            <div class="af-card">
+                <div class="af-section-head">
+                    <div class="af-section-num">1</div>
+                    <div>
+                        <span class="af-section-title">Machine Info</span>
+                        <span class="af-section-sub">Assign client and enter unit details</span>
+                    </div>
+                </div>
+                <div class="af-body">
+                    <div class="af-row">
+                        <div class="af-field af-field-full">
+                            <label class="af-label" for="clientInput">Client</label>
+                            <div class="combo-wrap">
+                                <input type="text" id="clientInput" name="clientName" autocomplete="off" placeholder="Type client name..." required>
+                                <input type="hidden" id="clientId" name="clientId" value="<%= selectedClientId %>">
+                                <ul id="clientDropdown" class="combo-dropdown" aria-label="Client suggestions"></ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="af-row">
+                        <div class="af-field">
+                            <label class="af-label" for="unit">Unit Type</label>
+                            <select id="unit" name="unit" required>
+                                <option value="">Select unit</option>
+                                <option value="CIJ"    <%= (savedAsset && savedAsset.unit === 'CIJ')    ? 'selected' : '' %>>CIJ</option>
+                                <option value="TTO"    <%= (savedAsset && savedAsset.unit === 'TTO')    ? 'selected' : '' %>>TTO</option>
+                                <option value="P&A"    <%= (savedAsset && savedAsset.unit === 'P&A')    ? 'selected' : '' %>>P&A</option>
+                                <option value="DOD"    <%= (savedAsset && savedAsset.unit === 'DOD')    ? 'selected' : '' %>>DOD</option>
+                                <option value="LASER"  <%= (savedAsset && savedAsset.unit === 'LASER')  ? 'selected' : '' %>>LASER</option>
+                                <option value="SUNINE" <%= (savedAsset && savedAsset.unit === 'SUNINE') ? 'selected' : '' %>>SUNINE</option>
+                                <option value="ANSER"  <%= (savedAsset && savedAsset.unit === 'ANSER')  ? 'selected' : '' %>>ANSER</option>
+                            </select>
+                        </div>
+                        <div class="af-field">
+                            <label class="af-label" for="model">Model</label>
+                            <div class="combo-wrap model-combo-wrap">
+                                <input type="text" id="model" name="model" autocomplete="off" placeholder="Search model" value="<%= savedAsset ? savedAsset.model : '' %>" required />
+                                <ul id="modelDropdown" class="combo-dropdown" aria-label="Model suggestions"></ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="af-row">
+                        <div class="af-field">
+                            <label class="af-label" for="serialNo">Serial No.</label>
+                            <input type="text" id="serialNo" name="serialNo" placeholder="e.g. SN-000123" value="<%= savedAsset ? savedAsset.serialNo : '' %>" required />
+                        </div>
+                        <div class="af-field">
+                            <label class="af-label" for="dateInstalled">Date Installed</label>
+                            <input type="date" id="dateInstalled" name="dateInstalled" value="<%= savedAsset ? savedAsset.dateInstalled : '' %>" required />
+                        </div>
+                    </div>
+                    <div class="af-row">
+                        <div class="af-field">
+                            <label class="af-label" for="runningHours">Running Hours</label>
+                            <input type="number" id="runningHours" name="runningHours" min="0" step="1" placeholder="e.g. 1200" value="<%= savedAsset ? savedAsset.runningHours : '' %>" required />
+                        </div>
+                        <div class="af-field">
+                            <label class="af-label" for="status">Status</label>
+                            <select id="status" name="status" required>
+                                <option value="">Select status</option>
+                                <option value="Active"      <%= (savedAsset && savedAsset.status === 'Active')      ? 'selected' : '' %>>Active</option>
+                                <option value="Maintenance" <%= (savedAsset && savedAsset.status === 'Maintenance') ? 'selected' : '' %>>Maintenance</option>
+                                <option value="Faulty"      <%= (savedAsset && savedAsset.status === 'Faulty')      ? 'selected' : '' %>>Faulty</option>
+                                <option value="Inactive"    <%= (savedAsset && savedAsset.status === 'Inactive')    ? 'selected' : '' %>>Inactive</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="af-row">
+                        <div class="af-field af-field-full">
+                            <label class="af-label" for="description">Description <span class="af-optional">optional</span></label>
+                            <textarea id="description" name="description" rows="3" placeholder="Add any notes about this unit…"><%= savedAsset ? savedAsset.description : '' %></textarea>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <% if (success) { %>
-            <div class="flash flash-success" id="flashMsg"><%= success %></div>
-            <% } %>
-            <% if (error) { %>
-            <div class="flash flash-error" id="flashMsg"><%= error %></div>
-            <% } %>
-
-            <form id="assetForm" action="/user_account/new-machine" method="POST">
-                <div class="form-grid">
-
-                    <label for="clientInput">Client</label>
-                    <div class="combo-wrap">
-                        <input type="text" id="clientInput" name="clientName" autocomplete="off" placeholder="Type client name..." required>
-                        <input type="hidden" id="clientId" name="clientId" value="<%= selectedClientId %>">
-                        <ul id="clientDropdown" class="combo-dropdown" aria-label="Client suggestions"></ul>
+            <!-- ── Section 2: Service Report ── -->
+            <div class="af-card">
+                <div class="af-section-head">
+                    <div class="af-section-num">2</div>
+                    <div>
+                        <span class="af-section-title">Service Report</span>
+                        <span class="af-section-sub">Document the initial service details</span>
                     </div>
-
-                    <label for="unit">Unit</label>
-                    <select id="unit" name="unit" required>
-                        <option value="">Select a unit</option>
-                        <option value="CIJ" <%= (savedAsset && savedAsset.unit === 'CIJ') ? 'selected' : '' %>>CIJ</option>
-                        <option value="TTO" <%= (savedAsset && savedAsset.unit === 'TTO') ? 'selected' : '' %>>TTO</option>
-                        <option value="P&A" <%= (savedAsset && savedAsset.unit === 'P&A') ? 'selected' : '' %>>P&A</option>
-                        <option value="DOD" <%= (savedAsset && savedAsset.unit === 'DOD') ? 'selected' : '' %>>DOD</option>
-                        <option value="LASER" <%= (savedAsset && savedAsset.unit === 'LASER') ? 'selected' : '' %>>LASER</option>
-                        <option value="SUNINE" <%= (savedAsset && savedAsset.unit === 'SUNINE') ? 'selected' : '' %>>SUNINE</option>
-                        <option value="ANSER" <%= (savedAsset && savedAsset.unit === 'ANSER') ? 'selected' : '' %>>ANSER</option>
-                    </select>
-                    <label for="model">Model</label>
-                    <div class="combo-wrap model-combo-wrap">
-                        <input type="text" id="model" name="model" autocomplete="off" placeholder="Search model" value="<%= savedAsset ? savedAsset.model : '' %>" required />
-                        <ul id="modelDropdown" class="combo-dropdown" aria-label="Model suggestions"></ul>
+                </div>
+                <div class="af-body">
+                    <div class="af-row">
+                        <div class="af-field af-field-full">
+                            <label class="edit-label" for="report-technicians">Other Technicians</label>
+                            <div class="report-tech-wrap">
+                                <input
+                                    class="edit-input"
+                                    id="report-technicians"
+                                    name="technicians"
+                                    type="text"
+                                    autocomplete="off"
+                                    placeholder="Type names separated by comma"
+                                />
+                                <ul id="report-tech-dropdown" class="report-tech-dropdown" aria-label="Technician suggestions"></ul>
+                            </div>
+                        </div>
                     </div>
-
-                    <label for="serialNo">Serial No.</label>
-                    <input type="text" id="serialNo" name="serialNo" placeholder="Enter serial number" value="<%= savedAsset ? savedAsset.serialNo : '' %>" required />
-
-                    <label for="dateInstalled">Date Installed</label>
-                    <input type="date" id="dateInstalled" name="dateInstalled" value="<%= savedAsset ? savedAsset.dateInstalled : '' %>" required />
-
-                    <label for="runningHours">Running Hours</label>
-                    <input type="number" id="runningHours" name="runningHours" min="0" step="1" placeholder="e.g. 1200" value="<%= savedAsset ? savedAsset.runningHours : '' %>" required />
-
-                    <label for="status">Status</label>
-                    <select id="status" name="status" required>
-                        <option value="">Select status</option>
-                        <option value="Active" <%= (savedAsset && savedAsset.status === 'Active') ? 'selected' : '' %>>Active</option>
-                        <option value="Maintenance" <%= (savedAsset && savedAsset.status === 'Maintenance') ? 'selected' : '' %>>Maintenance</option>
-                        <option value="Faulty" <%= (savedAsset && savedAsset.status === 'Faulty') ? 'selected' : '' %>>Faulty</option>
-                        <option value="Inactive" <%= (savedAsset && savedAsset.status === 'Inactive') ? 'selected' : '' %>>Inactive</option>
-                    </select>
-
-                    <label for="description">Description</label>
-                    <textarea id="description" name="description" rows="4" placeholder="Description"><%= savedAsset ? savedAsset.description : '' %></textarea>
+                    <div class="af-row">
+                        <div class="af-field af-field-full">
+                            <label class="af-label" for="report-problem">Problem / Root Cause <span class="af-optional">optional</span></label>
+                            <textarea id="report-problem" name="problem" rows="3" placeholder="Describe the problem or root cause…"></textarea>
+                        </div>
+                    </div>
+                    <div class="af-row">
+                        <div class="af-field af-field-full">
+                            <label class="af-label" for="report-action">Action Taken <span class="af-optional">optional</span></label>
+                            <textarea id="report-action" name="action" rows="3" placeholder="What actions were taken to resolve the issue?"></textarea>
+                        </div>
+                    </div>
+                    <div class="af-row">
+                        <div class="af-field af-field-full">
+                            <label class="af-label" for="report-recommendation">Recommendation <span class="af-optional">optional</span></label>
+                            <textarea id="report-recommendation" name="recommendation" rows="3" placeholder="Any recommendations for future maintenance?"></textarea>
+                        </div>
+                    </div>
                 </div>
+            </div>
 
-                <div style="margin-top: .8rem; display: flex; gap: .6rem; flex-wrap: wrap; align-items: center;">
-                    <button type="submit" class="btn btn-primary">Submit</button>
-                    <% if (savedAsset) { %>
-                    <span style="color: #1e7c3a; font-weight: 500;">
-                        Submitted — Unit: <%= savedAsset.unit %>, Model: <%= savedAsset.model %>, Serial: <%= savedAsset.serialNo %>
-                    </span>
-                    <% } %>
-                </div>
-            </form>
-        </div>
+            <!-- ── Submit ── -->
+            <div class="af-actions">
+                <% if (savedAsset) { %>
+                <span class="af-success-note">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    Saved — <%= savedAsset.unit %> · <%= savedAsset.model %> · <%= savedAsset.serialNo %>
+                </span>
+                <% } %>
+                <button type="submit" class="btn">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                    Submit
+                </button>
+            </div>
+        </form>
     </div>
 
     <script>
         const CLIENTS = <%- JSON.stringify(clients) %>;
         const INITIAL_CLIENT_ID = '<%= selectedClientId %>';
         const PARTS_CATALOG = <%- JSON.stringify(partsCatalog || {}) %>;
+        const CURRENT_USER_FULLNAME = <%- JSON.stringify(currentUser.fullName || '') %>;
+        const TEAM_MEMBERS = <%- JSON.stringify(typeof teamMembers !== 'undefined' ? teamMembers : []) %>;
     </script>
     <script src="/js/user_asset_form.js"></script>
 </body>

@@ -110,7 +110,7 @@ router.post('/:clientId/machines/update', requireAuth, async (req, res) => {
 
 router.post('/:clientId/machines/report', requireAuth, async (req, res) => {
   const clientId = String(req.params.clientId || '').trim();
-  const { serialNo, model, dateInstalled, report } = req.body || {};
+  const { serialNo, model, dateInstalled, report, updateIndex } = req.body || {};
 
   if (!serialNo || !model || !dateInstalled) {
     return res.status(400).json({ ok: false, error: 'Missing machine identity fields.' });
@@ -120,9 +120,12 @@ router.post('/:clientId/machines/report', requireAuth, async (req, res) => {
     return res.status(400).json({ ok: false, error: 'Missing report payload.' });
   }
 
+  const parsedUpdateIndex = Number(updateIndex);
+
   const safeReport = {
     date: String(report.date || ''),
     submittedBy: String(report.submittedBy || ''),
+    updateIndex: Number.isInteger(parsedUpdateIndex) && parsedUpdateIndex >= 0 ? parsedUpdateIndex : null,
     technicians: Array.isArray(report.technicians)
       ? report.technicians.map(name => String(name || '').trim()).filter(Boolean)
       : [],

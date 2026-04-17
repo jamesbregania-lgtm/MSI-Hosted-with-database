@@ -399,9 +399,9 @@
     "model": "9410",
     "serialNo": "fgg",
     "dateInstalled": "04/04/2022",
-    "runningHours": 2,
-    "status": "Active",
-    "description": "dd",
+    "runningHours": 1000,
+    "status": "Maintenance",
+    "description": "Undermaintenance",
     "submittedBy": "MSI Employee User",
     "maintenanceServiceDate": "17/04/2026",
     "partServiceDates": {
@@ -412,7 +412,9 @@
       "ENM 40209 AIR FILTER": "17/04/2026",
       "ENM 38980 MODULATION ASSEMBLY": "17/04/2026",
       "ENM 46408 FOUR ELECTOVALVE BLOCK": "17/04/2026",
-      "ENM 19134 INK FILTER": "17/04/2026"
+      "ENM 19134 INK FILTER": "17/04/2026",
+      "ENM 40830 IP54 OUTLET FOAM FILTER": "17/04/2026",
+      "ENM 49967 EQUIP PRINT HEADBOARD": "17/04/2026"
     },
     "partServiceHours": {
       "ENM 38941 GUTTER BLOCK": 2,
@@ -422,7 +424,9 @@
       "ENM 40209 AIR FILTER": 2,
       "ENM 38980 MODULATION ASSEMBLY": 2,
       "ENM 46408 FOUR ELECTOVALVE BLOCK": 2,
-      "ENM 19134 INK FILTER": 2
+      "ENM 19134 INK FILTER": 2,
+      "ENM 40830 IP54 OUTLET FOAM FILTER": 2,
+      "ENM 49967 EQUIP PRINT HEADBOARD": 2
     },
     "updates": [
       {
@@ -515,6 +519,56 @@
         "status": "Active",
         "runningHours": 2,
         "description": "dd"
+      },
+      {
+        "date": "17/04/2026",
+        "submittedBy": "MSI Employee User",
+        "status": "Active",
+        "runningHours": 2,
+        "description": "dd"
+      },
+      {
+        "date": "17/04/2026",
+        "submittedBy": "MSI Employee User",
+        "status": "Active",
+        "runningHours": 2,
+        "description": "dsd"
+      },
+      {
+        "date": "17/04/2026",
+        "submittedBy": "MSI Employee User, Andrew Collantes, Roberto Fernandez, Carlos Santos",
+        "status": "Maintenance",
+        "runningHours": 1000,
+        "description": "Undermaintenance",
+        "maintenanceUpdated": false,
+        "maintenanceServiceDate": "17/04/2026",
+        "partsUpdated": [
+          "ENM 49967 EQUIP PRINT HEADBOARD"
+        ],
+        "partServiceDates": {
+          "ENM 38941 GUTTER BLOCK": "17/04/2026",
+          "ENM 5629 PRESSURE PUMP": "17/04/2026",
+          "ENM 47458 EHV COVER": "17/04/2026",
+          "A40846 RECOVERY TOOL": "17/04/2026",
+          "ENM 40209 AIR FILTER": "17/04/2026",
+          "ENM 38980 MODULATION ASSEMBLY": "17/04/2026",
+          "ENM 46408 FOUR ELECTOVALVE BLOCK": "17/04/2026",
+          "ENM 19134 INK FILTER": "17/04/2026",
+          "ENM 40830 IP54 OUTLET FOAM FILTER": "17/04/2026",
+          "ENM 49967 EQUIP PRINT HEADBOARD": "17/04/2026"
+        },
+        "partServiceHours": {
+          "ENM 38941 GUTTER BLOCK": 2,
+          "ENM 5629 PRESSURE PUMP": 2,
+          "ENM 47458 EHV COVER": 2,
+          "A40846 RECOVERY TOOL": 2,
+          "ENM 40209 AIR FILTER": 2,
+          "ENM 38980 MODULATION ASSEMBLY": 2,
+          "ENM 46408 FOUR ELECTOVALVE BLOCK": 2,
+          "ENM 19134 INK FILTER": 2,
+          "ENM 40830 IP54 OUTLET FOAM FILTER": 2,
+          "ENM 49967 EQUIP PRINT HEADBOARD": 2
+        }
       }
     ],
     "reports": [
@@ -568,6 +622,19 @@
         "problem": "h",
         "action": "b",
         "recommendation": "c"
+      },
+      {
+        "date": "17/04/2026",
+        "submittedBy": "MSI Employee User, Andrew Collantes, Roberto Fernandez, Carlos Santos",
+        "technicians": [
+          "MSI Employee User",
+          "Andrew Collantes",
+          "Roberto Fernandez",
+          "Carlos Santos"
+        ],
+        "problem": "Damage",
+        "action": "Change parts",
+        "recommendation": "N/A"
       }
     ]
   },
@@ -21236,5 +21303,317 @@
       }
     ],
     "reports": []
+  },
+  {
+    "clientId": "alaska",
+    "clientName": "Alaska",
+    "location": "Neil Ella",
+    "unit": "CIJ",
+    "model": "9410",
+    "serialNo": "sdd",
+    "dateInstalled": "17/06/2018",
+    "runningHours": 23,
+    "status": "Active",
+    "description": "hell",
+    "submittedBy": "MSI Employee User",
+    "maintenanceServiceDate": "17/04/2026",
+    "partServiceDates": {
+      "ENM 38941 GUTTER BLOCK": "17/04/2026",
+      "ENM 49967 EQUIP PRINT HEADBOARD": "17/04/2026",
+      "ENM 47458 EHV COVER": "17/04/2026",
+      "ENM 46408 FOUR ELECTOVALVE BLOCK": "17/04/2026",
+      "ENM 38980 MODULATION ASSEMBLY": "17/04/2026",
+      "A40846 RECOVERY TOOL": "17/04/2026"
+    },
+    "partServiceHours": {
+      "ENM 38941 GUTTER BLOCK": 23,
+      "ENM 49967 EQUIP PRINT HEADBOARD": 23,
+      "ENM 47458 EHV COVER": 23,
+      "ENM 46408 FOUR ELECTOVALVE BLOCK": 23,
+      "ENM 38980 MODULATION ASSEMBLY": 23,
+      "A40846 RECOVERY TOOL": 23
+    },
+    "updates": [
+      {
+        "date": "17/04/2026",
+        "submittedBy": "MSI Employee User, Andrew Collantes",
+        "status": "Faulty",
+        "runningHours": 23,
+        "description": "dsdds",
+        "maintenanceUpdated": true,
+        "maintenanceServiceDate": "17/04/2026",
+        "partsUpdated": [],
+        "partServiceDates": {},
+        "partServiceHours": {}
+      },
+      {
+        "date": "17/04/2026",
+        "submittedBy": "MSI Employee User",
+        "status": "Faulty",
+        "runningHours": 23,
+        "description": "dsdds",
+        "maintenanceUpdated": false,
+        "maintenanceServiceDate": "17/04/2026",
+        "partsUpdated": [
+          "ENM 38941 GUTTER BLOCK"
+        ],
+        "partServiceDates": {
+          "ENM 38941 GUTTER BLOCK": "17/04/2026"
+        },
+        "partServiceHours": {
+          "ENM 38941 GUTTER BLOCK": 23
+        },
+        "report": {
+          "date": "17/04/2026",
+          "submittedBy": "MSI Employee User",
+          "updateIndex": 1,
+          "technicians": [
+            "Carlos Santos"
+          ],
+          "problem": "h",
+          "action": "k",
+          "recommendation": "g"
+        }
+      },
+      {
+        "date": "17/04/2026",
+        "submittedBy": "MSI Employee User",
+        "status": "Inactive",
+        "runningHours": 23,
+        "description": "dsdsds",
+        "maintenanceUpdated": false,
+        "maintenanceServiceDate": "17/04/2026",
+        "partsUpdated": [
+          "ENM 49967 EQUIP PRINT HEADBOARD"
+        ],
+        "partServiceDates": {
+          "ENM 38941 GUTTER BLOCK": "17/04/2026",
+          "ENM 49967 EQUIP PRINT HEADBOARD": "17/04/2026"
+        },
+        "partServiceHours": {
+          "ENM 38941 GUTTER BLOCK": 23,
+          "ENM 49967 EQUIP PRINT HEADBOARD": 23
+        },
+        "report": {
+          "date": "17/04/2026",
+          "submittedBy": "MSI Employee User",
+          "technicians": [
+            "MSI Employee User",
+            "Andrew Collantes",
+            "Carlos Santos"
+          ],
+          "problem": "d",
+          "action": "s",
+          "recommendation": "d",
+          "updateIndex": 2
+        }
+      },
+      {
+        "date": "17/04/2026",
+        "submittedBy": "MSI Employee User",
+        "status": "Active",
+        "runningHours": 23,
+        "description": "hell",
+        "maintenanceUpdated": false,
+        "maintenanceServiceDate": "17/04/2026",
+        "partsUpdated": [
+          "ENM 47458 EHV COVER",
+          "ENM 46408 FOUR ELECTOVALVE BLOCK",
+          "ENM 38980 MODULATION ASSEMBLY",
+          "A40846 RECOVERY TOOL"
+        ],
+        "partServiceDates": {
+          "ENM 38941 GUTTER BLOCK": "17/04/2026",
+          "ENM 49967 EQUIP PRINT HEADBOARD": "17/04/2026",
+          "ENM 47458 EHV COVER": "17/04/2026",
+          "ENM 46408 FOUR ELECTOVALVE BLOCK": "17/04/2026",
+          "ENM 38980 MODULATION ASSEMBLY": "17/04/2026",
+          "A40846 RECOVERY TOOL": "17/04/2026"
+        },
+        "partServiceHours": {
+          "ENM 38941 GUTTER BLOCK": 23,
+          "ENM 49967 EQUIP PRINT HEADBOARD": 23,
+          "ENM 47458 EHV COVER": 23,
+          "ENM 46408 FOUR ELECTOVALVE BLOCK": 23,
+          "ENM 38980 MODULATION ASSEMBLY": 23,
+          "A40846 RECOVERY TOOL": 23
+        },
+        "report": {
+          "date": "17/04/2026",
+          "submittedBy": "MSI Employee User",
+          "updateIndex": 3,
+          "technicians": [
+            "MSI Employee User",
+            "Andrew Collantes",
+            "Carlos Santos",
+            "Roberto Fernandez"
+          ],
+          "problem": "s",
+          "action": "d",
+          "recommendation": "a"
+        }
+      }
+    ],
+    "reports": [
+      {
+        "date": "17/04/2026",
+        "submittedBy": "MSI Employee User, Andrew Collantes",
+        "technicians": [
+          "MSI Employee User",
+          "Andrew Collantes"
+        ],
+        "problem": "N/A",
+        "action": "N/A",
+        "recommendation": "N/A"
+      },
+      {
+        "date": "17/04/2026",
+        "submittedBy": "MSI Employee User",
+        "updateIndex": 1,
+        "technicians": [
+          "Carlos Santos"
+        ],
+        "problem": "h",
+        "action": "k",
+        "recommendation": "g"
+      },
+      {
+        "date": "17/04/2026",
+        "submittedBy": "MSI Employee User",
+        "updateIndex": 2,
+        "technicians": [
+          "MSI Employee User",
+          "Andrew Collantes",
+          "Carlos Santos"
+        ],
+        "problem": "d",
+        "action": "s",
+        "recommendation": "d"
+      },
+      {
+        "date": "17/04/2026",
+        "submittedBy": "MSI Employee User",
+        "updateIndex": 3,
+        "technicians": [
+          "MSI Employee User",
+          "Andrew Collantes",
+          "Carlos Santos",
+          "Roberto Fernandez"
+        ],
+        "problem": "s",
+        "action": "d",
+        "recommendation": "a"
+      }
+    ]
+  },
+  {
+    "clientId": "alaska",
+    "clientName": "Alaska",
+    "location": "Neil Ella",
+    "unit": "CIJ",
+    "model": "9450",
+    "serialNo": "sh",
+    "dateInstalled": "17/04/2023",
+    "runningHours": 100,
+    "status": "Maintenance",
+    "description": "sd",
+    "submittedBy": "MSI Employee User",
+    "maintenanceServiceDate": "",
+    "partServiceDates": {},
+    "partServiceHours": {},
+    "updates": [
+      {
+        "date": "17/04/2026",
+        "submittedBy": "MSI Employee User",
+        "status": "Active",
+        "runningHours": 100,
+        "description": "sd",
+        "maintenanceUpdated": false,
+        "maintenanceServiceDate": "",
+        "partsUpdated": [],
+        "partServiceDates": {},
+        "partServiceHours": {}
+      },
+      {
+        "date": "17/04/2026",
+        "submittedBy": "MSI Employee User",
+        "status": "Maintenance",
+        "runningHours": 100,
+        "description": "sd",
+        "maintenanceUpdated": false,
+        "maintenanceServiceDate": "",
+        "partsUpdated": [],
+        "partServiceDates": {},
+        "partServiceHours": {}
+      }
+    ]
+  },
+  {
+    "clientId": "alaska",
+    "clientName": "Alaska",
+    "location": "Neil Ella",
+    "unit": "CIJ",
+    "model": "9410",
+    "serialNo": "sn23",
+    "dateInstalled": "17/06/2024",
+    "runningHours": "120",
+    "status": "Active",
+    "description": "N/A",
+    "submittedBy": "MSI Employee User"
+  },
+  {
+    "clientId": "alaska",
+    "clientName": "Alaska",
+    "location": "Neil Ella",
+    "unit": "CIJ",
+    "model": "9450S",
+    "serialNo": "SDSDSDSSD",
+    "dateInstalled": "17/01/2024",
+    "runningHours": "12",
+    "status": "Active",
+    "description": "SD",
+    "submittedBy": "MSI Employee User"
+  },
+  {
+    "clientId": "alaska",
+    "clientName": "Alaska",
+    "location": "Neil Ella",
+    "unit": "CIJ",
+    "model": "9410",
+    "serialNo": "adad",
+    "dateInstalled": "17/09/2024",
+    "runningHours": "2",
+    "status": "Active",
+    "description": "asd",
+    "submittedBy": "MSI Employee User"
+  },
+  {
+    "clientId": "alaska",
+    "clientName": "Alaska",
+    "location": "Neil Ella",
+    "unit": "CIJ",
+    "model": "9410",
+    "serialNo": "asd",
+    "dateInstalled": "17/09/2024",
+    "runningHours": "2",
+    "status": "Maintenance",
+    "description": "asd",
+    "submittedBy": "MSI Employee User",
+    "reports": [
+      {
+        "date": "17/09/2024",
+        "submittedBy": "MSI Employee User",
+        "updateIndex": null,
+        "technicians": [
+          "MSI Employee User",
+          "Andrew Collantes",
+          "Carlos Santos",
+          "Roberto Fernandez"
+        ],
+        "problem": "sd",
+        "action": "sd",
+        "recommendation": "sd"
+      }
+    ]
   }
 ]

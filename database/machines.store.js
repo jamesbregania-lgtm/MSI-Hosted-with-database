@@ -81,9 +81,16 @@ async function appendMachineReport(key, report) {
 
   target.reports.push(report);
 
-  // Keep Machine History technician column aligned with the saved report team.
+  // Keep Machine History aligned with the saved report team and tie report to update row.
   if (report && report.submittedBy && Array.isArray(target.updates) && target.updates.length > 0) {
-    target.updates[target.updates.length - 1].submittedBy = String(report.submittedBy);
+    const requestedIndex = Number(report.updateIndex);
+    const hasRequestedIndex = Number.isInteger(requestedIndex) && requestedIndex >= 0 && requestedIndex < target.updates.length;
+    const updateTarget = hasRequestedIndex
+      ? target.updates[requestedIndex]
+      : target.updates[target.updates.length - 1];
+
+    updateTarget.submittedBy = String(report.submittedBy);
+    updateTarget.report = { ...report };
   }
 
   await writeMachines(machines);
