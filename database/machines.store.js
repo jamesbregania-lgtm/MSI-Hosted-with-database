@@ -67,8 +67,32 @@ async function updateMachine(key, updates) {
   return target;
 }
 
+async function appendMachineReport(key, report) {
+  const machines = await readMachines();
+  const target = machines.find(machine => isSameMachine(machine, key));
+
+  if (!target) {
+    return null;
+  }
+
+  if (!Array.isArray(target.reports)) {
+    target.reports = [];
+  }
+
+  target.reports.push(report);
+
+  // Keep Machine History technician column aligned with the saved report team.
+  if (report && report.submittedBy && Array.isArray(target.updates) && target.updates.length > 0) {
+    target.updates[target.updates.length - 1].submittedBy = String(report.submittedBy);
+  }
+
+  await writeMachines(machines);
+  return target;
+}
+
 module.exports = {
   listMachinesByClientId,
   addMachine,
-  updateMachine
+  updateMachine,
+  appendMachineReport
 };

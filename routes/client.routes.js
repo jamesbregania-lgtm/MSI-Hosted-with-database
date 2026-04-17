@@ -1,6 +1,7 @@
 const express = require('express');
 const { listActiveClients, findClientById } = require('../database/clients.store');
-const { listMachinesByClientId, updateMachine } = require('../database/machines.store');
+const { listMachinesByClientId, updateMachine, appendMachineReport } = require('../database/machines.store');
+const { listUserAccounts } = require('../database/accounts.store');
 const { requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
@@ -25,15 +26,25 @@ router.get('/:clientId/machines', requireAuth, async (req, res) => {
 router.get('/:clientId', requireAuth, async (req, res) => {
   try {
     const activeClients = await listActiveClients();
+    const userAccounts = await listUserAccounts();
     const clientId = req.params.clientId;
     const client = await findClientById(clientId);
     const machineRecords = client ? await listMachinesByClientId(client.id) : [];
+    const currentFullName = String(req.session?.user?.fullName || '').trim().toLowerCase();
+    const teamMembers = userAccounts
+      .filter(account => account.status === 'active')
+      .map(account => account.fullName)
+      .filter(Boolean)
+      .filter(name => String(name).trim().toLowerCase() !== currentFullName)
+      .filter((name, index, arr) => arr.indexOf(name) === index)
+      .sort((a, b) => a.localeCompare(b));
 
     res.render('client', {
       currentUser: req.session.user,
       clientId,
       clients: activeClients,
-      machineRecords
+      machineRecords,
+      teamMembers
     });
   } catch (error) {
     console.error('Failed to render client page:', error);
@@ -41,7 +52,8 @@ router.get('/:clientId', requireAuth, async (req, res) => {
       currentUser: req.session.user,
       clientId: req.params.clientId || '',
       clients: [],
-      machineRecords: []
+      machineRecords: [],
+      teamMembers: []
     });
   }
 });
@@ -87,6 +99,41 @@ router.post('/:clientId/machines/update', requireAuth, async (req, res) => {
       partServiceHours: partServiceHours && typeof partServiceHours === 'object' ? partServiceHours : {},
       updates: safeUpdates
     }
+  );
+
+  if (!machine) {
+    return res.status(404).json({ ok: false, error: 'Machine record not found.' });
+  }
+
+  return res.json({ ok: true, machine });
+});
+
+router.post('/:clientId/machines/report', requireAuth, async (req, res) => {
+  const clientId = String(req.params.clientId || '').trim();
+  const { serialNo, model, dateInstalled, report } = req.body || {};
+
+  if (!serialNo || !model || !dateInstalled) {
+    return res.status(400).json({ ok: false, error: 'Missing machine identity fields.' });
+  }
+
+  if (!report || typeof report !== 'object') {
+    return res.status(400).json({ ok: false, error: 'Missing report payload.' });
+  }
+
+  const safeReport = {
+    date: String(report.date || ''),
+    submittedBy: String(report.submittedBy || ''),
+    technicians: Array.isArray(report.technicians)
+      ? report.technicians.map(name => String(name || '').trim()).filter(Boolean)
+      : [],
+    problem: String(report.problem || ''),
+    action: String(report.action || ''),
+    recommendation: String(report.recommendation || '')
+  };
+
+  const machine = await appendMachineReport(
+    { clientId, serialNo, model, dateInstalled },
+    safeReport
   );
 
   if (!machine) {

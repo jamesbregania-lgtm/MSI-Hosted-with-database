@@ -232,6 +232,73 @@
         </div>
     </div>
 
+    <!-- ── Add Report Modal (opened after Save Update) ── -->
+    <div class="popup-overlay" id="reportPopup" style="display:none;">
+        <div class="popup-card report-popup-card" style="width: min(600px, 96vw); max-height: 90vh; overflow-y: auto;">
+            <button class="close-btn" id="closeReportPopup">×</button>
+            <div class="report-popup-header">
+                <div class="report-popup-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                </div>
+                <div>
+                    <h3 style="margin:0 0 2px 0;">Add Report</h3>
+                    <p style="margin:0;font-size:13px;color:var(--muted);">Document the service report for this update</p>
+                </div>
+            </div>
+
+            <!-- Read-only machine info -->
+            <div class="edit-readonly-section" style="margin-bottom:18px;">
+                <div class="edit-readonly-row">
+                    <span class="edit-readonly-label">Unit</span>
+                    <span class="edit-readonly-value" id="report-unit-display">—</span>
+                </div>
+                <div class="edit-readonly-row">
+                    <span class="edit-readonly-label">Model</span>
+                    <span class="edit-readonly-value" id="report-model-display">—</span>
+                </div>
+                <div class="edit-readonly-row">
+                    <span class="edit-readonly-label">Serial No.</span>
+                    <span class="edit-readonly-value" id="report-serial-display">—</span>
+                </div>
+            </div>
+
+            <form id="reportForm">
+                <div class="edit-form-grid">
+
+                    <label class="edit-label" for="report-problem">Problem / Root Cause</label>
+                    <textarea class="edit-input" id="report-problem" rows="3" placeholder="Describe the problem or root cause..."></textarea>
+
+                    <label class="edit-label" for="report-action">Action Taken</label>
+                    <textarea class="edit-input" id="report-action" rows="3" placeholder="What actions were taken to resolve the issue?"></textarea>
+
+                    <label class="edit-label" for="report-recommendation">Recommendation</label>
+                    <textarea class="edit-input" id="report-recommendation" rows="3" placeholder="Any recommendations for future maintenance or improvements?"></textarea>
+
+                    <label class="edit-label" for="report-technicians">Technicians</label>
+                    <div class="report-tech-wrap">
+                        <input
+                            class="edit-input"
+                            id="report-technicians"
+                            type="text"
+                            autocomplete="off"
+                            placeholder="Type names separated by comma"
+                        />
+                        <ul id="report-tech-dropdown" class="report-tech-dropdown" aria-label="Technician suggestions"></ul>
+                    </div>
+
+
+                </div>
+
+                <div style="margin-top:18px; display:flex; gap:10px; justify-content:flex-end;">
+                    <button type="submit" class="btn report-submit-btn">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                        Save Report
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- ── Confirm Modal (custom replacement for browser confirm) ── -->
     <div class="popup-overlay" id="confirmOverlay" style="display:none;">
         <div class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmMessage">
@@ -249,6 +316,7 @@
         const CLIENTS = <%- JSON.stringify(clients) %>;
         const MACHINE_RECORDS = <%- JSON.stringify(typeof machineRecords !== 'undefined' ? machineRecords : []) %>;
         const CURRENT_USER_FULLNAME = <%- JSON.stringify(currentUser.fullName || '') %>;
+        const TEAM_MEMBERS = <%- JSON.stringify(typeof teamMembers !== 'undefined' ? teamMembers : []) %>;
     </script>
 
     <script src="/js/client.js"></script>

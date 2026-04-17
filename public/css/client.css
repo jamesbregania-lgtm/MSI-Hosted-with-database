@@ -958,11 +958,16 @@ tbody tr:hover { background: var(--navy-pale); }
     padding: 10px 12px;
     border-bottom: 1px solid var(--border);
     color: var(--text);
+    vertical-align: middle;
 }
 
 .history-table tbody tr:hover {
     background: var(--navy-pale);
     cursor: pointer;
+}
+
+.history-tech-cell {
+    min-width: 170px;
 }
 
 /*  History Detail Popup  */
@@ -1065,6 +1070,51 @@ tbody tr:hover { background: var(--navy-pale); }
     border-color: var(--navy);
     background: var(--white);
     box-shadow: 0 0 0 3px rgba(31,78,121,0.09);
+}
+
+.report-tech-wrap {
+    position: relative;
+}
+
+.report-tech-dropdown {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + 6px);
+    list-style: none;
+    margin: 0;
+    padding: 4px;
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    box-shadow: 0 8px 20px rgba(15, 24, 44, 0.12);
+    max-height: 220px;
+    overflow-y: auto;
+    z-index: 15;
+    display: none;
+}
+
+.report-tech-dropdown.open {
+    display: block;
+}
+
+.report-tech-item {
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--text);
+    cursor: pointer;
+}
+
+.report-tech-item:hover,
+.report-tech-item.is-active {
+    background: var(--navy-pale);
+}
+
+.report-tech-empty {
+    padding: 8px 10px;
+    font-size: 12px;
+    color: var(--muted);
 }
 
 /*  Warning cell (no row number, just icon)  */
@@ -1285,4 +1335,38 @@ tbody tr:hover { background: var(--navy-pale); }
         flex: 1;
         justify-content: center;
     }
+}
+/* ── Add Report Popup ── */
+.report-popup-card {
+    position: relative;
+}
+
+.report-popup-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 18px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+.report-popup-icon {
+    width: 40px;
+    height: 40px;
+    background: var(--navy-pale);
+    border-radius: var(--r-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: var(--navy);
+}
+
+.report-submit-btn {
+    display: flex;
+    align-items: center;
+}
+
+.report-submit-btn svg {
+    flex-shrink: 0;
 }
